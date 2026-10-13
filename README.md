@@ -179,42 +179,71 @@ If you are running on a machine without a dedicated high-end GPU or want **zero 
 Paste and run the following code in the notebook cell:
 
 ```python
-# 1. Install dependencies & Cloudflare tunnel
-!pip install -q fastapi uvicorn diffusers transformers accelerate sentencepiece
+# ১. প্রয়োজনীয় লাইব্রেরি আপডেট ও ইনস্টল
+import sys
+# Force-remove cached diffusers and torchao modules to prevent Python from importing the old versions from memory
+for module in list(sys.modules.keys()):
+    if "diffusers" in module or "torchao" in module:
+        sys.modules.pop(module, None)
+
+# Uninstall torchao completely to prevent duplicate C++ operator registration errors
+!pip uninstall -y torchao
+!pip install -q -U diffusers transformers accelerate bitsandbytes sentencepiece fastapi uvicorn
 !wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
 !dpkg -i cloudflared-linux-amd64.deb
 
-# 2. Start remote GPU diffusion worker
+# ২. 4-Bit আল্ট্রা-লাইটওয়েট LTX-Video সার্ভার (No RAM Crash)
 import threading, time, torch
 from fastapi import FastAPI, Form
 from fastapi.responses import FileResponse
 from diffusers import LTXPipeline
+from diffusers.quantizers import PipelineQuantizationConfig
 from diffusers.utils import export_to_video
 import uvicorn
 
 app = FastAPI()
-print("⚡ Loading LTX-Video on Google Colab T4 GPU...")
+print("⚡ Loading 4-Bit LTX-Video on Google Colab T4 GPU (Under 4GB RAM)...")
+
+# মেমোরি ১৫ জিবি থেকে কমিয়ে ৩.৫ জিবিতে নিয়ে আসা (Using stable bitsandbytes config directly)
+quant_config = PipelineQuantizationConfig(
+    quant_backend="bitsandbytes_4bit",
+    quant_kwargs={
+        "load_in_4bit": True,
+        "bnb_4bit_quant_type": "nf4",
+        "bnb_4bit_compute_dtype": torch.float16
+    },
+    components_to_quantize=["transformer", "text_encoder"]
+)
+
 pipe = LTXPipeline.from_pretrained(
-    "Lightricks/LTX-Video", 
-    torch_dtype=torch.float16,
+    "Lightricks/LTX-Video",
+    quantization_config=quant_config,
+    dtype=torch.float16,
     low_cpu_mem_usage=True
 )
-pipe.enable_model_cpu_offload(device="cuda")
+pipe.enable_model_cpu_offload()
 
 @app.post("/generate")
-def generate_video(prompt: str = Form(...), steps: int = Form(20), frames: int = Form(41)):
-    output = pipe(prompt=prompt, num_inference_steps=steps, num_frames=frames, width=640, height=384).frames[0]
+def generate_video(prompt: str = Form(...), steps: int = Form(25), frames: int = Form(41)):
+    output = pipe(
+        prompt=prompt,
+        num_inference_steps=steps,
+        num_frames=frames,
+        width=640,
+        height=384
+    ).frames[0]
     export_to_video(output, "output.mp4", fps=25)
     return FileResponse("output.mp4", media_type="video/mp4")
 
+# ব্যাকগ্রাউন্ডে সার্ভার চালানো
 def run_app():
     uvicorn.run(app, host="127.0.0.1", port=8000)
 
 threading.Thread(target=run_app, daemon=True).start()
 time.sleep(3)
 
-# 3. Create secure tunnel
-print("\n🔗 Your live cloud tunnel is generating below...\n")
+# ৩. ক্লাউড টানেল লিঙ্ক তৈরি
+print("\n🔗 আপনার ক্লাউড টানেল লিঙ্ক তৈরি হচ্ছে...\n")
 !cloudflared tunnel --url http://127.0.0.1:8000
 ```
 
