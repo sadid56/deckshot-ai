@@ -17,5 +17,6 @@ export interface GenerationSettings {
   frames: number;
   steps: number;
   fps: number;
+  aspectRatio: string; // "16:9" | "9:16" | "1:1"
   negativePrompt: string;
 }

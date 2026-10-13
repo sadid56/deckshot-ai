@@ -8,6 +8,7 @@ import {
   TimerOutlined as TimerIcon,
   SmartDisplayOutlined as ModelIcon,
   FilterAltOutlined as FilterIcon,
+  AspectRatioOutlined as AspectRatioIcon,
 } from "@mui/icons-material";
 import type { GenerationSettings } from "../types";
 import { studioTokens } from "../theme/theme";
@@ -25,6 +26,7 @@ const DEFAULT_SETTINGS: GenerationSettings = {
   frames: 81,
   steps: 30,
   fps: 25,
+  aspectRatio: "16:9",
   negativePrompt: "worst quality, blurry, distorted, glitch, sudden cuts, low resolution, artifacts",
 };
 
@@ -64,8 +66,8 @@ export const EngineSettingsDrawer: React.FC<EngineSettingsDrawerProps> = ({ open
             width: { xs: "100vw", sm: 400 },
             bgcolor: studioTokens.bgPanel,
             backgroundImage: "none !important",
-            borderLeft: `1px solid ${studioTokens.borderDefault}`,
-            boxShadow: "-16px 0 40px rgba(0, 0, 0, 0.8)",
+            borderLeft: "1px solid rgba(255, 255, 255, 0.16)",
+            boxShadow: "-20px 0 50px rgba(0, 0, 0, 0.9)",
             p: 3,
             display: "flex",
             flexDirection: "column",
@@ -132,6 +134,25 @@ export const EngineSettingsDrawer: React.FC<EngineSettingsDrawerProps> = ({ open
             size='small'
             value={settings.model}
             onChange={(e) => onUpdate("model", e.target.value)}
+            MenuProps={{
+              anchorOrigin: { vertical: "bottom", horizontal: "left" },
+              transformOrigin: { vertical: "top", horizontal: "left" },
+              slotProps: {
+                paper: {
+                  sx: {
+                    width: { xs: "calc(100vw - 48px)", sm: 352 },
+                    boxSizing: "border-box",
+                    bgcolor: `${studioTokens.bgElevated} !important`,
+                    backgroundImage: "none !important",
+                    border: "1px solid rgba(255, 255, 255, 0.14) !important",
+                    boxShadow: `0 22px 50px rgba(0, 0, 0, 0.92), 0 0 0 1px ${studioTokens.borderDefault} !important`,
+                    borderRadius: "10px !important",
+                    mt: 0.6,
+                    p: 0.5,
+                  },
+                },
+              },
+            }}
             sx={{
               bgcolor: studioTokens.bgInput,
               color: studioTokens.textPrimary,
@@ -142,10 +163,10 @@ export const EngineSettingsDrawer: React.FC<EngineSettingsDrawerProps> = ({ open
               "&:hover": { borderColor: "rgba(255, 255, 255, 0.2)" },
             }}
           >
-            <MenuItem value='ltx' sx={{ fontSize: "0.88rem" }}>
+            <MenuItem value='ltx' sx={{ fontSize: "0.85rem" }}>
               Lightricks/LTX-Video (25 FPS - Recommended)
             </MenuItem>
-            <MenuItem value='cogvideox' sx={{ fontSize: "0.88rem" }}>
+            <MenuItem value='cogvideox' sx={{ fontSize: "0.85rem" }}>
               THUDM/CogVideoX-5B-I2V
             </MenuItem>
           </Select>
@@ -164,6 +185,25 @@ export const EngineSettingsDrawer: React.FC<EngineSettingsDrawerProps> = ({ open
             size='small'
             value={settings.duration || 5}
             onChange={(e) => handleDurationChange(Number(e.target.value))}
+            MenuProps={{
+              anchorOrigin: { vertical: "bottom", horizontal: "left" },
+              transformOrigin: { vertical: "top", horizontal: "left" },
+              slotProps: {
+                paper: {
+                  sx: {
+                    width: { xs: "calc(100vw - 48px)", sm: 352 },
+                    boxSizing: "border-box",
+                    bgcolor: `${studioTokens.bgElevated} !important`,
+                    backgroundImage: "none !important",
+                    border: "1px solid rgba(255, 255, 255, 0.14) !important",
+                    boxShadow: `0 22px 50px rgba(0, 0, 0, 0.92), 0 0 0 1px ${studioTokens.borderDefault} !important`,
+                    borderRadius: "10px !important",
+                    mt: 0.6,
+                    p: 0.5,
+                  },
+                },
+              },
+            }}
             sx={{
               bgcolor: studioTokens.bgInput,
               color: studioTokens.textPrimary,
@@ -174,20 +214,20 @@ export const EngineSettingsDrawer: React.FC<EngineSettingsDrawerProps> = ({ open
               "&:hover": { borderColor: "rgba(255, 255, 255, 0.2)" },
             }}
           >
-            <MenuItem value={5} sx={{ fontSize: "0.88rem" }}>
+            <MenuItem value={5} sx={{ fontSize: "0.85rem" }}>
               5 Seconds • Social Media Teaser
             </MenuItem>
-            <MenuItem value={10} sx={{ fontSize: "0.88rem" }}>
+            <MenuItem value={10} sx={{ fontSize: "0.85rem" }}>
               10 Seconds • Product Showcase
             </MenuItem>
-            <MenuItem value={30} sx={{ fontSize: "0.88rem" }}>
+            <MenuItem value={30} sx={{ fontSize: "0.85rem" }}>
               30 Seconds • Commercial Ad Spot
             </MenuItem>
-            <MenuItem value={60} sx={{ fontSize: "0.88rem" }}>
-              60 Seconds (1 Minute) • Full Presentation
+            <MenuItem value={60} sx={{ fontSize: "0.85rem" }}>
+              60 Seconds (1 Min) • Full Presentation
             </MenuItem>
-            <MenuItem value={120} sx={{ fontSize: "0.88rem" }}>
-              120 Seconds (2 Minutes) • Extended Cinematic Story
+            <MenuItem value={120} sx={{ fontSize: "0.85rem" }}>
+              120 Seconds (2 Min) • Extended Cinematic Story
             </MenuItem>
           </Select>
           <Typography variant='caption' sx={{ color: studioTokens.textMuted, display: "block", mt: 0.8, fontSize: "0.73rem" }}>
@@ -197,7 +237,50 @@ export const EngineSettingsDrawer: React.FC<EngineSettingsDrawerProps> = ({ open
           </Typography>
         </Box>
 
-        {/* 3. Negative Prompt Filter */}
+        {/* 3. Target Aspect Ratio */}
+        <Box>
+          <Stack direction='row' spacing={1} sx={{ alignItems: "center", mb: 0.8 }}>
+            <AspectRatioIcon sx={{ fontSize: 17, color: studioTokens.primaryLight }} />
+            <Typography variant='body2' sx={{ fontWeight: 700, color: studioTokens.textPrimary }}>
+              Aspect Ratio
+            </Typography>
+          </Stack>
+          <Stack direction='row' spacing={1}>
+            {[
+              { label: "16:9 Landscape", val: "16:9" },
+              { label: "9:16 Vertical", val: "9:16" },
+              { label: "1:1 Square", val: "1:1" },
+            ].map((r) => {
+              const isSelected = (settings.aspectRatio || "16:9") === r.val;
+              return (
+                <Button
+                  key={r.val}
+                  size='small'
+                  variant='outlined'
+                  onClick={() => onUpdate("aspectRatio", r.val)}
+                  sx={{
+                    flex: 1,
+                    py: 0.6,
+                    fontSize: "0.78rem",
+                    fontWeight: isSelected ? 700 : 500,
+                    bgcolor: isSelected ? studioTokens.primarySubtle : studioTokens.bgInput,
+                    color: isSelected ? studioTokens.primaryLight : studioTokens.textSecondary,
+                    borderColor: isSelected ? studioTokens.primaryLight : studioTokens.borderDefault,
+                    "&:hover": {
+                      bgcolor: isSelected ? studioTokens.primarySubtle : studioTokens.bgSubtle,
+                      borderColor: studioTokens.primaryLight,
+                      color: studioTokens.textPrimary,
+                    },
+                  }}
+                >
+                  {r.val}
+                </Button>
+              );
+            })}
+          </Stack>
+        </Box>
+
+        {/* 4. Negative Prompt Filter */}
         <Box>
           <Stack direction='row' spacing={1} sx={{ alignItems: "center", mb: 0.8 }}>
             <FilterIcon sx={{ fontSize: 17, color: studioTokens.primaryLight }} />

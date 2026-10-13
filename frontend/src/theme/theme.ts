@@ -1,33 +1,29 @@
 import { createTheme } from '@mui/material';
 
 export const studioTokens = {
-  bgCanvas: "#090c10", // Deepest background
-  bgPanel: "#0d1117", // Panels, cards & drawer surface (clean obsidian)
-  bgInput: "#131822", // Inputs, dropzones & console
-  bgElevated: "#1a2232", // Active selections & highlights
-  bgSubtle: "#161c28", // Hover states & secondary tags
+  bgCanvas: "#101413",
+  bgPanel: "#191c1b",
+  bgInput: "#0d100f",
+  bgElevated: "#232726",
+  bgSubtle: "#2d3130",
 
-  // Borders & Outlines
   borderDefault: "rgba(255, 255, 255, 0.08)",
-  borderHover: "rgba(59, 130, 246, 0.50)",
-  borderActive: "#2563eb",
+  borderHover: "rgba(128, 203, 196, 0.50)",
+  borderActive: "#80cbc4",
 
-  // Primary Accent (Vibrant Studio Blue)
-  primary: "#2563eb",
-  primaryHover: "#1d4ed8",
-  primaryLight: "#60a5fa",
-  primarySubtle: "rgba(37, 99, 235, 0.15)",
+  primary: "#80cbc4", // M3 Teal
+  primaryHover: "#a7ffeb",
+  primaryLight: "#a7ffeb",
+  primarySubtle: "rgba(128, 203, 196, 0.16)",
 
-  // Typography
-  textPrimary: "#f8fafc",
-  textSecondary: "#94a3b8",
-  textMuted: "#64748b",
+  textPrimary: "#e0e3e1",
+  textSecondary: "#bfc9c7",
+  textMuted: "#899391",
 
-  // Semantic Status
-  success: "#10b981",
-  successSubtle: "rgba(16, 185, 129, 0.15)",
-  error: "#ef4444",
-  errorSubtle: "rgba(239, 68, 68, 0.15)",
+  success: "#a5d6a7",
+  successSubtle: "rgba(165, 214, 167, 0.15)",
+  error: "#ffb4ab",
+  errorSubtle: "rgba(255, 180, 171, 0.15)",
 };
 
 export const darkTheme = createTheme({
@@ -77,7 +73,6 @@ export const darkTheme = createTheme({
         },
       },
     },
-    // CRITICAL: Disable MUI's default white milky elevation overlay on dark mode surfaces!
     MuiPaper: {
       styleOverrides: {
         root: {
@@ -101,7 +96,56 @@ export const darkTheme = createTheme({
           backgroundColor: studioTokens.bgPanel,
           border: `1px solid ${studioTokens.borderDefault}`,
           borderRadius: 10,
-          boxShadow: "none",
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
+        },
+      },
+    },
+    // Distinct, clearly visible floating dropdown menus & popovers using studioTokens
+    MuiPopover: {
+      styleOverrides: {
+        paper: {
+          backgroundImage: "none !important",
+          backgroundColor: `${studioTokens.bgElevated} !important`,
+          border: "1px solid rgba(255, 255, 255, 0.14) !important",
+          boxShadow: `0 20px 48px rgba(0, 0, 0, 0.9), 0 0 0 1px ${studioTokens.borderDefault} !important`,
+          borderRadius: "10px !important",
+        },
+      },
+    },
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: `${studioTokens.bgElevated} !important`,
+          backgroundImage: "none !important",
+          border: "1px solid rgba(255, 255, 255, 0.14) !important",
+          boxShadow: `0 20px 48px rgba(0, 0, 0, 0.9), 0 0 0 1px ${studioTokens.borderDefault} !important`,
+          borderRadius: "10px !important",
+          marginTop: "6px",
+        },
+        list: {
+          padding: "6px",
+        },
+      },
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          fontSize: "0.85rem",
+          borderRadius: 6,
+          margin: "2px 4px",
+          color: studioTokens.textPrimary,
+          "&:hover": {
+            backgroundColor: studioTokens.bgSubtle,
+          },
+          "&.Mui-selected": {
+            backgroundColor: `${studioTokens.primarySubtle} !important`,
+            color: `${studioTokens.primaryLight} !important`,
+            fontWeight: 600,
+            border: `1px solid ${studioTokens.primarySubtle}`,
+            "&:hover": {
+              backgroundColor: "rgba(128, 203, 196, 0.25) !important",
+            },
+          },
         },
       },
     },
@@ -135,7 +179,7 @@ export const darkTheme = createTheme({
             borderColor: studioTokens.borderDefault,
           },
           "&:hover .MuiOutlinedInput-notchedOutline": {
-            borderColor: "rgba(255, 255, 255, 0.20)",
+            borderColor: "rgba(255, 255, 255, 0.25)",
           },
           "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
             borderColor: studioTokens.primary,

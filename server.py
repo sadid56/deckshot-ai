@@ -158,6 +158,7 @@ async def api_generate_single(
     steps: int = Form(30),
     frames: int = Form(81),
     fps: int = Form(25),
+    aspect_ratio: str = Form("16:9"),
 ):
     if not prompt or not prompt.trim() if hasattr(prompt, "trim") else not prompt.strip():
         raise HTTPException(status_code=400, detail="Please provide a prompt.")
@@ -206,6 +207,7 @@ async def api_generate_scenes(
     steps: int = Form(30),
     frames: int = Form(81),
     fps: int = Form(25),
+    aspect_ratio: str = Form("16:9"),
 ):
     job_id = str(uuid.uuid4())
     try:
