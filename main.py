@@ -23,9 +23,10 @@ def parse_arguments():
     parser.add_argument(
         "--image",
         type=str,
-        default=DEFAULT_IMAGE,
-        help="Path to single input reference image (e.g., assets/inputs/input.jpg)",
+        default=None,
+        help="Path to input reference image (optional, leave empty for Text-to-Video)",
     )
+
     parser.add_argument(
         "--prompt",
         type=str,
@@ -37,6 +38,11 @@ def parse_arguments():
         type=str,
         default=DEFAULT_NEGATIVE_PROMPT,
         help="Negative prompt to suppress visual artifacts",
+    )
+    parser.add_argument(
+        "--download-only",
+        action="store_true",
+        help="Pre-download and cache model weights from Hugging Face without running video generation",
     )
     parser.add_argument(
         "--scenes",
@@ -94,8 +100,20 @@ def main():
     print(f"📁 Target Output:   {args.output}")
     print("==================================================")
 
-    # Load the selected diffusion pipeline
-    pipe = load_video_pipeline(model_name=args.model, device=device)
+    if args.download_only:
+        print("\n📥 Pre-downloading model weights to Hugging Face cache (~/.cache/huggingface)...")
+        print("➡️  [1/2] Fetching Text-to-Video pipeline...")
+        load_video_pipeline(model_name=args.model, device=device, is_image_to_video=False)
+        print("➡️  [2/2] Fetching Image-to-Video pipeline...")
+        load_video_pipeline(model_name=args.model, device=device, is_image_to_video=True)
+        print("\n==================================================")
+        print("✅ All model weights successfully downloaded and cached locally!")
+        print("You can now run DeckShot AI completely offline without waiting.")
+        print("==================================================")
+        return
+
+    has_image = args.image is not None and os.path.exists(args.image)
+    pipe = load_video_pipeline(model_name=args.model, device=device, is_image_to_video=has_image)
 
     # Case 1: Multi-scene via scenes.json
     if args.scenes:
@@ -130,25 +148,12 @@ def main():
             model_name=args.model,
         )
 
-    # Case 3: Single-image video generation
+    # Case 3: Single-video generation (Text-to-Video or Image-to-Video)
     else:
-        if not os.path.exists(args.image):
-            print(f"\n[Warning] Input image '{args.image}' not found.")
-            # Check fallback in assets/inputs/
-            fallback = os.path.join("assets", "inputs", os.path.basename(args.image))
-            if os.path.exists(fallback):
-                args.image = fallback
-                print(f"[Info] Found image at fallback location: '{args.image}'")
-            elif os.path.exists("input.jpg"):
-                args.image = "input.jpg"
-                print(f"[Info] Found 'input.jpg' in root directory.")
-            else:
-                print("Please provide a valid image using --image or place 'input.jpg' in assets/inputs/")
-                sys.exit(1)
-
+        active_image = args.image if (args.image and os.path.exists(args.image)) else None
         generate_single_video(
             pipe=pipe,
-            image_path=args.image,
+            image_path=active_image,
             prompt=args.prompt,
             negative_prompt=args.negative_prompt,
             steps=args.steps,
@@ -161,6 +166,7 @@ def main():
 
     print("\n🎉 Process completed successfully!")
     print(f"Generated video available at: {os.path.abspath(args.output)}")
+
 
 if __name__ == "__main__":
     main()

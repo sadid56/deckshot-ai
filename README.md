@@ -22,7 +22,8 @@ A local, private AI video creation studio powered by cutting-edge diffusion mode
 | **Python**           | 3.9 - 3.12                                                 | 3.10 or 3.11                            |
 | **Node.js & pnpm**   | Node.js 18+ and pnpm 8+                                    | Node.js 20+ and pnpm 10+                |
 | **Memory / VRAM**    | 16 GB Unified Memory (Mac) or 12 GB VRAM (NVIDIA)          | 16 GB+ Unified Memory or 16 GB+ VRAM    |
-| **Disk Space**       | ~15 GB free space (for caching Hugging Face model weights) | Fast NVMe SSD                           |
+| **Disk Space**       | ~30 GB free space (for caching Hugging Face model & T5-XXL text encoder weights) | Fast NVMe SSD                           |
+
 
 ---
 
@@ -88,7 +89,36 @@ cd ..
 
 ---
 
+### 4. AI Model Download (~28–30 GB)
+
+Because DeckShot AI runs open-source diffusion models **100% locally and privately on your machine**, the model weights must be downloaded from Hugging Face before generating video.
+
+> **📦 Total Download Size:** Approximately **~28–30 GB**
+> - **Google T5-XXL Text Encoder:** ~19 GB (divided into 4 shards for high-fidelity prompt comprehension)
+> - **Lightricks LTX-Video DiT Transformer:** ~7.7 GB (core video generation engine)
+> - **Video Autoencoder (VAE) & Tokenizers:** ~1.7 GB
+
+You have two options to download the models:
+
+#### Option 1: Automatic Download on First Generation
+You don't need to do anything manually! When you trigger your first video generation (either through the Web Studio UI or CLI), DeckShot AI will automatically fetch and cache all model files.
+
+#### Option 2: Pre-download via CLI (Recommended)
+If you want to download all weights ahead of time so the Web Studio is ready to generate immediately without delay:
+
+```bash
+python main.py --download-only
+```
+
+> 💡 **Good to Know:**
+> - **One-time Download:** This download happens **ONLY ONCE**.
+> - **Local Cache:** All weights are permanently stored in your user cache directory (`~/.cache/huggingface/hub/`).
+> - **100% Offline:** Once downloaded, DeckShot AI operates entirely offline with zero external network calls or cloud dependencies.
+
+---
+
 ## 🎬 Running the Studio
+
 
 ### Option A: Web Studio (Recommended)
 
