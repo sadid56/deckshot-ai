@@ -1,0 +1,75 @@
+# ==========================================
+# Python & Virtual Environments
+# ==========================================
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ==========================================
+# Node / Frontend / pnpm
+# ==========================================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.pnpm-debug.log*
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==========================================
+# Generated AI Video Outputs & Temp Uploads
+# ==========================================
+assets/outputs/*.mp4
+assets/outputs/temp_clips/
+assets/inputs/upload_*
+assets/inputs/scene_*
+*.mp4
+!sample*.mp4
+
+# Keep directory structure intact
+!assets/inputs/.gitkeep
+!assets/outputs/.gitkeep
+
+# ==========================================
+# Environments, Secrets & Configs
+# ==========================================
+.env
+.env.local
+.env.*.local
+
+# ==========================================
+# IDE & System Files
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.log
