@@ -2,6 +2,7 @@ from typing import Any, Optional
 import torch
 from diffusers import CogVideoXImageToVideoPipeline, CogVideoXPipeline
 from src.models.base import BaseVideoModelEngine
+from src.logger import logger
 
 
 class CogVideoXEngine(BaseVideoModelEngine):
@@ -24,28 +25,38 @@ class CogVideoXEngine(BaseVideoModelEngine):
     t2v_repo = "THUDM/CogVideoX-2b"
 
     def download_weights(self, device: str = "cpu") -> None:
-        print(f"\n[CogVideoXEngine] Fetching model weights from Hugging Face...")
-        print(f"➡️  [1/2] Pre-caching Text-to-Video '{self.t2v_repo}'...")
-        CogVideoXPipeline.from_pretrained(self.t2v_repo, torch_dtype=torch.bfloat16)
-        print(f"➡️  [2/2] Pre-caching Image-to-Video '{self.i2v_repo}'...")
-        CogVideoXImageToVideoPipeline.from_pretrained(self.i2v_repo, torch_dtype=torch.bfloat16)
-        print("✅ [CogVideoXEngine] Model weights cached locally.")
+        logger.model(self.id, "Fetching model weights from Hugging Face...")
+        logger.step(1, 2, f"Pre-caching Text-to-Video '{self.t2v_repo}'...")
+        CogVideoXPipeline.from_pretrained(self.t2v_repo, dtype=torch.bfloat16)
+        logger.step(2, 2, f"Pre-caching Image-to-Video '{self.i2v_repo}'...")
+        CogVideoXImageToVideoPipeline.from_pretrained(self.i2v_repo, dtype=torch.bfloat16)
+        logger.model(self.id, "Model weights cached locally.", level="success")
 
     def load_pipeline(self, device: str = "mps", is_image_to_video: bool = True) -> Any:
         dtype = torch.bfloat16
+        repo = self.i2v_repo if is_image_to_video else self.t2v_repo
+        mode = "Image-to-Video" if is_image_to_video else "Text-to-Video"
+        logger.model(self.id, f"Loading {repo} ({mode})...")
+
         if is_image_to_video:
-            print(f"[CogVideoXEngine] Loading {self.i2v_repo} (Image-to-Video)...")
-            pipe = CogVideoXImageToVideoPipeline.from_pretrained(self.i2v_repo, torch_dtype=dtype)
+            pipe = CogVideoXImageToVideoPipeline.from_pretrained(self.i2v_repo, dtype=dtype)
         else:
-            print(f"[CogVideoXEngine] Loading {self.t2v_repo} (Text-to-Video)...")
-            pipe = CogVideoXPipeline.from_pretrained(self.t2v_repo, torch_dtype=dtype)
+            pipe = CogVideoXPipeline.from_pretrained(self.t2v_repo, dtype=dtype)
 
         pipe.vae.enable_slicing()
         pipe.vae.enable_tiling()
 
-        if device in ["cuda", "mps"]:
-            print(f"[CogVideoXEngine] Enabling model CPU offload for {device.upper()} acceleration...")
-            pipe.enable_model_cpu_offload()
+        if device == "cuda":
+            logger.model(self.id, "Enabling model CPU offload for CUDA acceleration...")
+            pipe.enable_model_cpu_offload(device="cuda")
+        elif device == "mps":
+            logger.model(self.id, "Configuring pipeline for Apple Silicon (MPS)...")
+            try:
+                pipe.enable_model_cpu_offload(device="mps")
+            except Exception:
+                pipe.to("mps")
+        else:
+            pipe.to("cpu")
 
         return pipe
 

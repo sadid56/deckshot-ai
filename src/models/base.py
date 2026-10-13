@@ -4,6 +4,7 @@ import importlib
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 import torch
+from src.logger import logger
 
 
 class BaseVideoModelEngine(ABC):
@@ -43,17 +44,17 @@ class BaseVideoModelEngine(ABC):
         """Install missing pip dependencies for this model engine."""
         missing = [pkg for pkg, installed in self.check_dependencies().items() if not installed]
         if not missing:
-            print(f"[ModelEngine:{self.id}] All dependencies already satisfied.")
+            logger.model(self.id, "All dependencies already satisfied.")
             return True
 
-        print(f"[ModelEngine:{self.id}] Installing required dependencies: {missing}")
+        logger.model(self.id, f"Installing required dependencies: {missing}")
         try:
             cmd = [sys.executable, "-m", "pip", "install"] + missing
             subprocess.check_call(cmd)
-            print(f"✅ [ModelEngine:{self.id}] Successfully installed dependencies.")
+            logger.model(self.id, "Successfully installed dependencies.", level="success")
             return True
         except Exception as e:
-            print(f"❌ [ModelEngine:{self.id}] Failed to install dependencies: {e}")
+            logger.model(self.id, f"Failed to install dependencies: {e}", level="error")
             return False
 
     @abstractmethod

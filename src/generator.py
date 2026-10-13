@@ -2,6 +2,7 @@ import os
 import torch
 from src.utils import load_image_safely, save_frames_to_video, concatenate_video_clips
 from src.models import ModelRegistry
+from src.logger import logger
 
 
 def generate_single_video(
@@ -32,7 +33,7 @@ def generate_single_video(
     # Case A: Extended presentation / 1-2 min video (duration >= 30s)
     if duration >= 30:
         num_shots = max(1, round(duration / 5.0))
-        print(f"\n[Generator] Generating {duration}s ({duration // 60}m {duration % 60}s) video via {num_shots} sequential shots with {engine.name}...")
+        logger.banner(f"Extended Synthesis ({duration}s target via {num_shots} shots with {engine.name})")
 
         temp_dir = os.path.join(os.path.dirname(output_path), "temp_shots")
         os.makedirs(temp_dir, exist_ok=True)
@@ -40,7 +41,7 @@ def generate_single_video(
 
         for shot_idx in range(num_shots):
             shot_file = os.path.join(temp_dir, f"shot_{shot_idx:02d}.mp4")
-            print(f"🎬 [Shot {shot_idx + 1}/{num_shots}] Generating sequence...")
+            logger.stage("SEQUENCE", f"Shot {shot_idx + 1}/{num_shots} rendering...")
             generator = torch.Generator(device=device).manual_seed(seed + shot_idx * 17)
 
             video_frames = engine.generate(
@@ -59,15 +60,17 @@ def generate_single_video(
             save_frames_to_video(video_frames, shot_file, fps=fps)
             shot_paths.append(shot_file)
 
-        print(f"[Generator] Stitching {len(shot_paths)} shots into master {duration}s video...")
+        logger.stage("STITCHING", f"Concatenating {len(shot_paths)} shots into master presentation...")
         concatenate_video_clips(shot_paths, output_path, fps=fps)
-        print(f"✅ Extended presentation video saved: {output_path}")
+        logger.success(f"Extended presentation video saved: {output_path}")
         return output_path
 
     # Case B: Standard clip (5s - 10s)
     generator = torch.Generator(device=device).manual_seed(seed)
-    print(f"\n[Generator] Engine: {engine.name} | Mode: {mode_label} | {frames} frames @ {fps} FPS, {steps} steps")
-    print(f"[Generator] Prompt: \"{prompt}\"")
+    logger.info(
+        f"Engine: {engine.name} | Mode: {mode_label} | {frames} frames @ {fps} FPS, {steps} steps"
+    )
+    logger.info(f'Prompt: "{prompt}"')
 
     video_frames = engine.generate(
         pipe=pipe,
@@ -83,7 +86,7 @@ def generate_single_video(
     )
 
     save_frames_to_video(video_frames, output_path, fps=fps)
-    print(f"[Generator] Clip saved successfully: {output_path}")
+    logger.success(f"Clip saved successfully: {output_path}")
     return output_path
 
 
@@ -104,9 +107,7 @@ def generate_multi_scene_video(
     clip_paths = []
     engine = ModelRegistry.get(model_name)
 
-    print(f"\n==========================================")
-    print(f"🎬 Starting Multi-Scene Presentation ({len(scenes)} scenes with {engine.name}, Target: {duration}s)")
-    print(f"==========================================")
+    logger.banner(f"Multi-Scene Presentation ({len(scenes)} scenes with {engine.name}, Target: {duration}s)")
 
     for idx, scene in enumerate(scenes, start=1):
         image_path = scene.get("image")
@@ -114,12 +115,12 @@ def generate_multi_scene_video(
         negative_prompt = scene.get("negative_prompt", "worst quality, blurry, distorted")
         scene_clip_path = os.path.join(temp_dir, f"scene_{idx:02d}.mp4")
 
-        print(f"\n--- Processing Scene {idx}/{len(scenes)} ---")
+        logger.stage("SCENE", f"Processing {idx}/{len(scenes)}")
         if image_path and os.path.exists(image_path):
-            print(f"Image Reference: {image_path}")
+            logger.info(f"Image Reference: {image_path}")
         else:
-            print("Mode: Text-to-Video (No reference image)")
-        print(f"Prompt: {prompt}")
+            logger.info("Mode: Text-to-Video (No reference image)")
+        logger.info(f'Prompt: "{prompt}"')
 
         generate_single_video(
             pipe=pipe,
@@ -137,7 +138,7 @@ def generate_multi_scene_video(
         )
         clip_paths.append(scene_clip_path)
 
-    print(f"\n[Stitching] Concatenating {len(clip_paths)} scenes into master presentation...")
+    logger.stage("STITCHING", f"Concatenating {len(clip_paths)} scenes into master presentation...")
     concatenate_video_clips(clip_paths, output_path, fps=fps)
-    print(f"✅ Master presentation video created: {output_path}")
+    logger.success(f"Master presentation video created: {output_path}")
     return output_path

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, Box, Typography, LinearProgress, Stack } from '@mui/material';
 import { Terminal as TerminalIcon, Sync as SyncIcon } from '@mui/icons-material';
-import { studioTokens } from '../theme/theme';
+import { studioTokens } from '../../theme/theme';
 
 interface ProgressCardProps {
   progress: number;
@@ -39,7 +39,7 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({ progress, progressPh
         value={progress}
         sx={{
           height: 6,
-          borderRadius: 3,
+          borderRadius: `${studioTokens.radiusPill}px`,
           bgcolor: studioTokens.bgSubtle,
           '& .MuiLinearProgress-bar': {
             bgcolor: studioTokens.primary,
@@ -52,7 +52,7 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({ progress, progressPh
         sx={{
           mt: 2,
           p: 1.5,
-          borderRadius: 1.5,
+          borderRadius: `${studioTokens.radiusSm}px`,
           bgcolor: studioTokens.bgInput,
           border: `1px solid ${studioTokens.borderDefault}`,
           maxHeight: 120,

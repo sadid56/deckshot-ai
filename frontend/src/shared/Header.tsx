@@ -20,11 +20,11 @@ const DeckShotLogo = () => (
     {/* Front Video Scene Card */}
     <rect x='9' y='10' width='18' height='14' rx='2.5' fill={studioTokens.primary} />
     {/* Filmstrip slide marks */}
-    <rect x='11' y='12' width='1.8' height='1.8' rx='0.5' fill='#ffffff' opacity='0.8' />
-    <rect x='11' y='15.5' width='1.8' height='1.8' rx='0.5' fill='#ffffff' opacity='0.8' />
-    <rect x='11' y='19' width='1.8' height='1.8' rx='0.5' fill='#ffffff' opacity='0.8' />
+    <rect x='11' y='12' width='1.8' height='1.8' rx='0.5' fill={studioTokens.textWhite} opacity='0.8' />
+    <rect x='11' y='15.5' width='1.8' height='1.8' rx='0.5' fill={studioTokens.textWhite} opacity='0.8' />
+    <rect x='11' y='19' width='1.8' height='1.8' rx='0.5' fill={studioTokens.textWhite} opacity='0.8' />
     {/* Cinematic Shot Play Action */}
-    <path d='M16 13.5L23 17L16 20.5V13.5Z' fill='#ffffff' />
+    <path d='M16 13.5L23 17L16 20.5V13.5Z' fill={studioTokens.textWhite} />
   </svg>
 );
 
@@ -50,7 +50,7 @@ export const Header = ({ hardware }: HeaderProps) => {
                 sx={{
                   px: 0.8,
                   py: 0.2,
-                  borderRadius: 1,
+                  borderRadius: `${studioTokens.radiusSm}px`,
                   fontSize: "0.62rem",
                   fontWeight: 700,
                   bgcolor: studioTokens.primarySubtle,
@@ -76,7 +76,7 @@ export const Header = ({ hardware }: HeaderProps) => {
               gap: 1.2,
               px: 1.6,
               py: 0.6,
-              borderRadius: 2,
+              borderRadius: `${studioTokens.radiusMd}px`,
               bgcolor: studioTokens.bgInput,
               border: `1px solid ${studioTokens.borderDefault}`,
             }}

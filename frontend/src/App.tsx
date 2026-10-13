@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Container,
-  Button,
   Stack,
 } from '@mui/material';
 import {
@@ -13,15 +13,18 @@ import {
   Tune as TuneIcon,
 } from "@mui/icons-material";
 import { studioTokens } from './theme/theme';
-import type { SceneItem, RecentVideo, GenerationSettings } from "./types";
-import { Header } from './components/Header';
-import { SingleSceneTab } from './components/SingleSceneTab';
-import { MultiSceneTab } from './components/MultiSceneTab';
-import { EngineSettingsDrawer } from './components/EngineSettingsDrawer';
-import { ProgressCard } from './components/ProgressCard';
-import { VideoStage } from './components/VideoStage';
-import { RecentGenerations } from './components/RecentGenerations';
+import type { SceneItem, GenerationSettings } from "./types";
+import { Header } from "./shared/Header";
+import { SingleSceneTab } from "./features/home/SingleSceneTab";
+import { MultiSceneTab } from "./features/home/MultiSceneTab";
+import { EngineSettingsDrawer } from "./features/home/EngineSettingsDrawer";
+import { ProgressCard } from "./features/home/ProgressCard";
+import { VideoStage } from "./features/home/VideoStage";
+import { RecentGenerations } from "./features/home/RecentGenerations";
 import { useToast } from './context/ToastContext';
+import { Tabs, Button } from './components/ui';
+import { api, queryKeys, type GenerationResponse } from './api';
+import { useAppQuery, useAppMutation } from './hooks';
 
 export interface StudioFormValues {
   prompt: string;
@@ -34,7 +37,6 @@ export interface StudioFormValues {
 export default function App() {
   const toast = useToast();
   const [tabIndex, setTabIndex] = useState<number>(0);
-  const [hardware, setHardware] = useState<string>('LOCAL ACCELERATOR');
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   // React Hook Form
@@ -87,37 +89,23 @@ export default function App() {
   const [progressPhase, setProgressPhase] = useState<string>('Idle');
   const [logs, setLogs] = useState<string[]>([]);
   const [outputVideoUrl, setOutputVideoUrl] = useState<string | null>(null);
-  const [recentVideos, setRecentVideos] = useState<RecentVideo[]>([]);
+  const queryClient = useQueryClient();
+
+  // Queries
+  const { data: systemData } = useAppQuery({
+    queryKey: queryKeys.system,
+    queryFn: api.getSystem,
+    showErrorToast: false,
+  });
+  const hardware = systemData?.device ? `${systemData.device} GPU ACCELERATION` : 'APPLE SILICON / MPS';
+
+  const { data: recentVideos = [], refetch: refetchRecentVideos } = useAppQuery({
+    queryKey: queryKeys.recentVideos,
+    queryFn: api.getRecentVideos,
+    showErrorToast: false,
+  });
 
   const pollIntervalRef = useRef<any>(null);
-
-  // Initialize
-  useEffect(() => {
-    fetch('/api/system')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.device) setHardware(`${data.device} GPU ACCELERATION`);
-      })
-      .catch(() => setHardware('APPLE SILICON / MPS'));
-
-    fetchRecentVideos();
-
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    };
-  }, []);
-
-  const fetchRecentVideos = async () => {
-    try {
-      const res = await fetch('/api/recent-videos');
-      if (res.ok) {
-        const data = await res.json();
-        setRecentVideos(data);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const handleUpdateSetting = (key: keyof GenerationSettings, value: any) => {
     setValue(`settings.${key}` as any, value);
@@ -175,6 +163,60 @@ export default function App() {
     );
   };
 
+  const startPolling = (jobId: string) => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const job = await api.getJobStatus(jobId);
+
+        setProgress(job.progress);
+        if (job.progress < 25) setProgressPhase('Initializing Diffusion Pipeline...');
+        else if (job.progress < 70) setProgressPhase('Neural Latent Denoising...');
+        else if (job.progress < 99) setProgressPhase('Encoding High-Definition Video...');
+        else setProgressPhase('Render Complete!');
+
+        if (job.logs) setLogs(job.logs);
+
+        if (job.status === 'completed') {
+          clearInterval(pollIntervalRef.current);
+          setIsGenerating(false);
+          setOutputVideoUrl(job.video_url);
+          toast.success('Cinematic video rendered successfully!');
+          queryClient.invalidateQueries({ queryKey: queryKeys.recentVideos });
+        } else if (job.status === 'failed') {
+          clearInterval(pollIntervalRef.current);
+          setIsGenerating(false);
+          toast.error(`Render failed: ${job.error || 'Unknown error'}`);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }, 2000);
+  };
+
+  // Generation Mutations
+  const singleSceneMutation = useAppMutation<FormData, GenerationResponse>({
+    mutationFn: (formData) => api.generateSingle(formData),
+    errorMessage: 'Single scene generation submission failed',
+    onSuccess: (res) => {
+      startPolling(res.job_id);
+    },
+    onError: () => {
+      setIsGenerating(false);
+    },
+  });
+
+  const multiSceneMutation = useAppMutation<FormData, GenerationResponse>({
+    mutationFn: (formData) => api.generateScenes(formData),
+    errorMessage: 'Storyboard sequence generation submission failed',
+    onSuccess: (res) => {
+      startPolling(res.job_id);
+    },
+    onError: () => {
+      setIsGenerating(false);
+    },
+  });
+
   // Generation Dispatcher (React Hook Form onSubmit)
   const onSubmit = async (data: StudioFormValues) => {
     // Validation
@@ -205,15 +247,13 @@ export default function App() {
     formData.append('aspect_ratio', data.settings.aspectRatio || '16:9');
     formData.append('negative_prompt', data.settings.negativePrompt);
 
-    let endpoint = '/api/generate';
-
     if (tabIndex === 0) {
       formData.append('prompt', data.prompt);
       if (data.singleImageFile) {
         formData.append('image', data.singleImageFile);
       }
+      singleSceneMutation.mutate(formData);
     } else {
-      endpoint = '/api/generate-scenes';
       const scenesPayload = data.scenes.map((s) => {
         let filename = '';
         if (s.file) {
@@ -223,53 +263,8 @@ export default function App() {
         return { image: filename, prompt: s.prompt };
       });
       formData.append('scenes_json', JSON.stringify(scenesPayload));
+      multiSceneMutation.mutate(formData);
     }
-
-    try {
-      const res = await fetch(endpoint, { method: 'POST', body: formData });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Generation failed');
-      }
-      const resData = await res.json();
-      startPolling(resData.job_id);
-    } catch (err: any) {
-      toast.error(err.message || 'Error occurred during submission');
-      setIsGenerating(false);
-    }
-  };
-
-  const startPolling = (jobId: string) => {
-    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    pollIntervalRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/status/${jobId}`);
-        if (!res.ok) return;
-        const job = await res.json();
-
-        setProgress(job.progress);
-        if (job.progress < 25) setProgressPhase('Initializing Diffusion Pipeline...');
-        else if (job.progress < 70) setProgressPhase('Neural Latent Denoising...');
-        else if (job.progress < 99) setProgressPhase('Encoding High-Definition Video...');
-        else setProgressPhase('Render Complete!');
-
-        if (job.logs) setLogs(job.logs);
-
-        if (job.status === 'completed') {
-          clearInterval(pollIntervalRef.current);
-          setIsGenerating(false);
-          setOutputVideoUrl(job.video_url);
-          toast.success('Cinematic video rendered successfully!');
-          fetchRecentVideos();
-        } else if (job.status === 'failed') {
-          clearInterval(pollIntervalRef.current);
-          setIsGenerating(false);
-          toast.error(`Render failed: ${job.error || 'Unknown error'}`);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }, 2000);
   };
 
   return (
@@ -281,92 +276,48 @@ export default function App() {
       <Container maxWidth='xl' sx={{ py: 3.5 }}>
 
         {/* Studio Top Bar: Mode Switcher + Quick Engine Specs Badge */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 3.5,
-            flexWrap: "wrap",
-            gap: 2,
-          }}
-        >
-          {/* Segmented Mode Selector */}
-          <Box
-            sx={{
-              display: "inline-flex",
-              bgcolor: studioTokens.bgPanel,
-              p: 0.6,
-              borderRadius: 2.5,
-              border: `1px solid ${studioTokens.borderDefault}`,
-              gap: 0.5,
-            }}
-          >
+        <Tabs
+          value={tabIndex}
+          onChange={(val) => setTabIndex(val)}
+          containerSx={{ mb: 3.5 }}
+          items={[
+            {
+              value: 0,
+              label: "Single Scene (Text / Image to Video)",
+              icon: <MovieIcon sx={{ fontSize: 18 }} />,
+            },
+            {
+              value: 1,
+              label: "Multi-Scene Storyboard",
+              icon: <ViewCarouselIcon sx={{ fontSize: 18 }} />,
+            },
+          ]}
+          rightElement={
             <Button
-              onClick={() => setTabIndex(0)}
-              startIcon={<MovieIcon sx={{ fontSize: 18 }} />}
+              variant='outlined'
+              size='small'
+              startIcon={<TuneIcon sx={{ fontSize: 16 }} />}
+              onClick={() => setIsSettingsOpen(true)}
               sx={{
-                px: 2.5,
-                py: 0.8,
-                borderRadius: 2,
-                fontWeight: 600,
-                fontSize: "0.88rem",
-                color: tabIndex === 0 ? studioTokens.textPrimary : studioTokens.textMuted,
-                bgcolor: tabIndex === 0 ? studioTokens.bgElevated : "transparent",
-                border: tabIndex === 0 ? `1px solid ${studioTokens.borderDefault}` : "1px solid transparent",
+                height: 40,
+                px: 2,
+                borderRadius: `${studioTokens.radiusMd}px`,
+                fontSize: "0.82rem",
+                fontWeight: 500,
+                borderColor: studioTokens.borderDefault,
+                color: studioTokens.textSecondary,
+                bgcolor: studioTokens.bgPanel,
                 "&:hover": {
-                  bgcolor: tabIndex === 0 ? studioTokens.bgElevated : studioTokens.bgSubtle,
+                  borderColor: studioTokens.primary,
+                  color: studioTokens.textPrimary,
+                  bgcolor: studioTokens.bgSubtle,
                 },
               }}
             >
-              Single Scene (Text / Image to Video)
+              {settings.model.toUpperCase()} • {settings.duration >= 60 ? `${settings.duration / 60} Min` : `${settings.duration}s`} Video
             </Button>
-            <Button
-              onClick={() => setTabIndex(1)}
-              startIcon={<ViewCarouselIcon sx={{ fontSize: 18 }} />}
-              sx={{
-                px: 2.5,
-                py: 0.8,
-                borderRadius: 2,
-                fontWeight: 600,
-                fontSize: "0.88rem",
-                color: tabIndex === 1 ? studioTokens.textPrimary : studioTokens.textMuted,
-                bgcolor: tabIndex === 1 ? studioTokens.bgElevated : "transparent",
-                border: tabIndex === 1 ? `1px solid ${studioTokens.borderDefault}` : "1px solid transparent",
-                "&:hover": {
-                  bgcolor: tabIndex === 1 ? studioTokens.bgElevated : studioTokens.bgSubtle,
-                },
-              }}
-            >
-              Multi-Scene Storyboard
-            </Button>
-          </Box>
-
-          {/* Quick Engine Specs Button (Opens Right Drawer) */}
-          <Button
-            variant='outlined'
-            size='small'
-            startIcon={<TuneIcon sx={{ fontSize: 16 }} />}
-            onClick={() => setIsSettingsOpen(true)}
-            sx={{
-              height: 40,
-              px: 2,
-              borderRadius: 2.5,
-              fontSize: "0.82rem",
-              fontWeight: 500,
-              borderColor: studioTokens.borderDefault,
-              color: studioTokens.textSecondary,
-              bgcolor: studioTokens.bgPanel,
-              "&:hover": {
-                borderColor: studioTokens.primary,
-                color: studioTokens.textPrimary,
-                bgcolor: studioTokens.bgSubtle,
-              },
-            }}
-          >
-            {settings.model.toUpperCase()} • {settings.duration >= 60 ? `${settings.duration / 60} Min` : `${settings.duration}s`} Video
-          </Button>
-        </Box>
+          }
+        />
 
         {/* 2-Column Grid Layout */}
         <Box
@@ -400,25 +351,18 @@ export default function App() {
 
             {/* Primary Generate Button (Directly below Creator Controls) */}
             <Button
-              variant='contained'
+              variant='primary'
               size='large'
-              disabled={isGenerating}
+              loading={isGenerating}
+              loadingText="Rendering Video in Studio..."
               onClick={handleSubmit(onSubmit)}
               startIcon={<MovieCreationIcon />}
               sx={{
                 py: 1.6,
-                fontSize: "0.98rem",
-                fontWeight: 600,
                 letterSpacing: "0.01em",
-                borderRadius: 2,
-                bgcolor: studioTokens.primary,
-                border: `1px solid ${studioTokens.borderDefault}`,
-                "&:hover": {
-                  bgcolor: studioTokens.primaryHover,
-                },
               }}
             >
-              {isGenerating ? "Rendering Video in Studio..." : "Render Cinematic Video"}
+              Render Cinematic Video
             </Button>
           </Stack>
 
@@ -432,7 +376,7 @@ export default function App() {
               recentVideos={recentVideos}
               currentVideoUrl={outputVideoUrl}
               onSelectVideo={setOutputVideoUrl}
-              onRefresh={fetchRecentVideos}
+              onRefresh={() => refetchRecentVideos()}
             />
           </Stack>
         </Box>

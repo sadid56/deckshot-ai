@@ -3,6 +3,15 @@ import sys
 import uuid
 import json
 import time
+import warnings
+
+# Suppress environment-specific warnings on macOS
+warnings.filterwarnings("ignore", message=".*urllib3 v2 only supports OpenSSL.*")
+warnings.filterwarnings(
+    "ignore",
+    message=".*User provided device_type of 'cuda'.*",
+    category=UserWarning,
+)
 import shutil
 import threading
 from typing import List, Optional
@@ -15,6 +24,7 @@ import config
 from src.models import ModelRegistry
 from src.pipeline import load_video_pipeline
 from src.generator import generate_single_video, generate_multi_scene_video
+from src.logger import logger
 
 app = FastAPI(title="DeckShot AI", description="Local Text-to-Video and Image-to-Video Studio")
 
@@ -317,7 +327,5 @@ if os.path.exists(frontend_dist):
 
 if __name__ == "__main__":
     import uvicorn
-    print("\n=======================================================")
-    print("🚀 Video AI Web Studio running at: http://localhost:8000")
-    print("=======================================================\n")
+    logger.banner("DeckShot AI Web Studio running at: http://localhost:8000")
     uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=False)

@@ -2,6 +2,7 @@ from typing import Any, Optional
 import torch
 from diffusers import LTXImageToVideoPipeline, LTXPipeline
 from src.models.base import BaseVideoModelEngine
+from src.logger import logger
 
 
 class LTXVideoEngine(BaseVideoModelEngine):
@@ -23,25 +24,34 @@ class LTXVideoEngine(BaseVideoModelEngine):
     repo_id = "Lightricks/LTX-Video"
 
     def download_weights(self, device: str = "cpu") -> None:
-        print(f"\n[LTXEngine] Fetching model weights for '{self.repo_id}' from Hugging Face...")
-        print("➡️  [1/2] Pre-caching Text-to-Video pipeline weights...")
-        LTXPipeline.from_pretrained(self.repo_id, torch_dtype=torch.bfloat16)
-        print("➡️  [2/2] Pre-caching Image-to-Video pipeline weights...")
-        LTXImageToVideoPipeline.from_pretrained(self.repo_id, torch_dtype=torch.bfloat16)
-        print(f"✅ [LTXEngine] '{self.repo_id}' cached locally.")
+        logger.model(self.id, f"Fetching model weights for '{self.repo_id}' from Hugging Face...")
+        logger.step(1, 2, "Pre-caching Text-to-Video pipeline weights...")
+        LTXPipeline.from_pretrained(self.repo_id, dtype=torch.bfloat16)
+        logger.step(2, 2, "Pre-caching Image-to-Video pipeline weights...")
+        LTXImageToVideoPipeline.from_pretrained(self.repo_id, dtype=torch.bfloat16)
+        logger.model(self.id, f"Weights for '{self.repo_id}' cached locally.", level="success")
 
     def load_pipeline(self, device: str = "mps", is_image_to_video: bool = True) -> Any:
         dtype = torch.bfloat16
-        if is_image_to_video:
-            print(f"[LTXEngine] Loading {self.repo_id} (Image-to-Video)...")
-            pipe = LTXImageToVideoPipeline.from_pretrained(self.repo_id, torch_dtype=dtype)
-        else:
-            print(f"[LTXEngine] Loading {self.repo_id} (Text-to-Video)...")
-            pipe = LTXPipeline.from_pretrained(self.repo_id, torch_dtype=dtype)
+        mode = "Image-to-Video" if is_image_to_video else "Text-to-Video"
+        logger.model(self.id, f"Loading {self.repo_id} ({mode})...")
 
-        if device in ["cuda", "mps"]:
-            print(f"[LTXEngine] Enabling model CPU offload for {device.upper()} acceleration...")
-            pipe.enable_model_cpu_offload()
+        if is_image_to_video:
+            pipe = LTXImageToVideoPipeline.from_pretrained(self.repo_id, dtype=dtype)
+        else:
+            pipe = LTXPipeline.from_pretrained(self.repo_id, dtype=dtype)
+
+        if device == "cuda":
+            logger.model(self.id, "Enabling model CPU offload for CUDA acceleration...")
+            pipe.enable_model_cpu_offload(device="cuda")
+        elif device == "mps":
+            logger.model(self.id, "Configuring pipeline for Apple Silicon (MPS)...")
+            try:
+                pipe.enable_model_cpu_offload(device="mps")
+            except Exception:
+                pipe.to("mps")
+        else:
+            pipe.to("cpu")
 
         return pipe
 

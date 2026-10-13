@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { Snackbar, Alert, type AlertColor } from "@mui/material";
+import { studioTokens } from "../theme/theme";
 
 export interface ToastMethods {
   (message: string, severity?: AlertColor): void;
@@ -63,8 +64,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           variant='filled'
           sx={{
             width: "100%",
-            borderRadius: 2,
-            boxShadow: "0 12px 36px rgba(0, 0, 0, 0.8)",
+            borderRadius: `${studioTokens.radiusMd}px`,
+            boxShadow: studioTokens.shadowElevated,
             fontSize: "0.86rem",
             fontWeight: 600,
           }}

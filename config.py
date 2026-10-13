@@ -1,4 +1,14 @@
 import os
+import warnings
+
+# Suppress environment-specific warnings on macOS
+warnings.filterwarnings("ignore", message=".*urllib3 v2 only supports OpenSSL.*")
+warnings.filterwarnings(
+    "ignore",
+    message=".*User provided device_type of 'cuda'.*",
+    category=UserWarning,
+)
+
 import torch
 
 # Base directories

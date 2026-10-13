@@ -2,6 +2,15 @@ import os
 import sys
 import json
 import argparse
+import warnings
+
+# Suppress environment-specific warnings on macOS
+warnings.filterwarnings("ignore", message=".*urllib3 v2 only supports OpenSSL.*")
+warnings.filterwarnings(
+    "ignore",
+    message=".*User provided device_type of 'cuda'.*",
+    category=UserWarning,
+)
 from config import (
     DEFAULT_PROMPT,
     DEFAULT_NEGATIVE_PROMPT,
@@ -15,6 +24,7 @@ from config import (
 from src.models import ModelRegistry
 from src.pipeline import load_video_pipeline
 from src.generator import generate_single_video, generate_multi_scene_video
+from src.logger import logger
 
 
 def parse_arguments():
@@ -108,19 +118,10 @@ def parse_arguments():
 
 def display_registered_models():
     models = ModelRegistry.list_models()
-    print("\n==========================================================================")
-    print("🎬 DeckShot AI: Registered Model Engines")
-    print("==========================================================================")
+    logger.banner("DeckShot AI: Registered Model Engines")
     for m in models:
-        status = "✅ Ready" if m["installed"] else "⚠️  Missing Dependencies (run --install-deps)"
-        print(f"\n🔹 Model ID:     {m['id']}")
-        print(f"   Name:         {m['name']}")
-        print(f"   Status:       {status}")
-        print(f"   Default FPS:  {m['default_fps']} FPS")
-        print(f"   Hardware:     {m['recommended_hardware']}")
-        print(f"   Description:  {m['description']}")
-        print(f"   Dependencies: {', '.join(m['dependencies'])}")
-    print("\n==========================================================================")
+        logger.model_card(m)
+    print("\n" + "=" * 64 + "\n")
 
 
 def main():
@@ -131,37 +132,33 @@ def main():
         return
 
     if args.install_deps:
-        print(f"\n📦 Installing dependencies for engine '{args.model}'...")
+        logger.info(f"Installing dependencies for engine '{args.model}'...")
         success = ModelRegistry.install(args.model)
         if success:
-            print(f"✅ Engine '{args.model}' is ready to run!")
+            logger.success(f"Engine '{args.model}' is ready to run!")
         else:
-            print(f"❌ Failed to install dependencies for '{args.model}'.")
+            logger.error(f"Failed to install dependencies for '{args.model}'.")
             sys.exit(1)
         return
 
     device = get_device()
     engine = ModelRegistry.get(args.model)
 
-    print("==================================================")
-    print("🎬 DeckShot AI: Video Production Studio")
-    print(f"🖥️  Compute Device: {device.upper()}")
-    print(f"📦 Model Engine:    {engine.name}")
-    print(f"⏱️  Duration:        {args.duration}s")
-    print(f"📁 Target Output:   {args.output}")
-    print("==================================================")
+    logger.banner("DeckShot AI: Video Production Studio")
+    logger.info(f"Compute Device: {device.upper()}")
+    logger.info(f"Model Engine:   {engine.name}")
+    logger.info(f"Target Duration: {args.duration}s")
+    logger.info(f"Output Path:    {args.output}")
 
     # Check dependencies before loading
     if not engine.is_installed():
-        print(f"⚠️  Missing dependencies for '{engine.id}'. Installing now...")
+        logger.warn(f"Missing dependencies for '{engine.id}'. Auto-installing now...")
         engine.install_dependencies()
 
     if args.download_only:
-        print(f"\n📥 Pre-downloading model weights for '{engine.id}' to local cache...")
+        logger.info(f"Pre-downloading model weights for '{engine.id}' to local cache...")
         ModelRegistry.download(args.model, device=device)
-        print("\n==================================================")
-        print("✅ Model weights successfully downloaded and cached locally!")
-        print("==================================================")
+        logger.success("Model weights successfully downloaded and cached locally!")
         return
 
     has_image = args.image is not None and os.path.exists(args.image)

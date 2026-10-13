@@ -1,11 +1,13 @@
 import React from 'react';
-import { Card, Box, Typography, Stack, Chip, Button } from '@mui/material';
+import { Card, Box, Typography, Stack } from '@mui/material';
 import {
   DownloadOutlined as DownloadIcon,
   CheckCircleOutlined as CheckIcon,
   VideocamOutlined as VideocamIcon,
 } from '@mui/icons-material';
-import { studioTokens } from '../theme/theme';
+import { studioTokens } from '../../theme/theme';
+import { Button } from '../../components/ui';
+import { StatusBadge } from '../../components/common';
 
 interface VideoStageProps {
   videoUrl: string | null;
@@ -85,17 +87,10 @@ export const VideoStage: React.FC<VideoStageProps> = ({ videoUrl, fps = 25, aspe
             {`VIEWPORT 01 • ${currentRatio} • ${currentFps} FPS`}
           </Typography>
         </Stack>
-        <Chip
+        <StatusBadge
+          status={videoUrl ? "ready" : "standby"}
           label={videoUrl ? "RENDER READY" : "STANDBY"}
-          size='small'
-          sx={{
-            height: 18,
-            fontSize: "0.62rem",
-            fontWeight: 700,
-            bgcolor: videoUrl ? studioTokens.successSubtle : studioTokens.bgSubtle,
-            color: videoUrl ? studioTokens.success : studioTokens.textMuted,
-            border: `1px solid ${videoUrl ? studioTokens.successSubtle : studioTokens.borderDefault}`,
-          }}
+          pulse={!!videoUrl}
         />
       </Box>
 
@@ -109,7 +104,7 @@ export const VideoStage: React.FC<VideoStageProps> = ({ videoUrl, fps = 25, aspe
             loop
             playsInline
             onLoadedMetadata={handleLoadedMetadata}
-            style={{ width: "100%", maxHeight: 460, backgroundColor: "#000000", display: "block" }}
+            style={{ width: "100%", maxHeight: 460, backgroundColor: studioTokens.bgBlack, display: "block" }}
           />
           <Box
             sx={{
@@ -128,15 +123,12 @@ export const VideoStage: React.FC<VideoStageProps> = ({ videoUrl, fps = 25, aspe
               </Typography>
             </Stack>
             <Button
-              variant='contained'
+              variant='primary'
               size='small'
               startIcon={<DownloadIcon />}
+              component='a'
               href={videoUrl}
               download='ai_video.mp4'
-              sx={{
-                bgcolor: studioTokens.primary,
-                "&:hover": { bgcolor: studioTokens.primaryHover },
-              }}
             >
               Export MP4
             </Button>
@@ -162,7 +154,7 @@ export const VideoStage: React.FC<VideoStageProps> = ({ videoUrl, fps = 25, aspe
               position: "absolute",
               inset: 16,
               border: `1px solid ${studioTokens.borderDefault}`,
-              borderRadius: 1,
+              borderRadius: `${studioTokens.radiusSm}px`,
               pointerEvents: "none",
             }}
           />
