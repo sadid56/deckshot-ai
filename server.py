@@ -55,6 +55,7 @@ def run_single_job(
     steps: int,
     frames: int,
     fps: int,
+    duration: int = 5,
 ):
     try:
         is_i2v = image_path is not None and os.path.exists(image_path)
@@ -62,13 +63,13 @@ def run_single_job(
 
         JOBS[job_id]["status"] = "running"
         JOBS[job_id]["progress"] = 15
-        JOBS[job_id]["logs"].append(f"Initializing {model_name.upper()} ({mode_name})...")
+        JOBS[job_id]["logs"].append(f"Initializing {model_name.upper()} ({mode_name}) for {duration}s video...")
 
         device = config.get_device()
         pipe = get_cached_pipeline(model_name, device, is_image_to_video=is_i2v)
 
-        JOBS[job_id]["progress"] = 40
-        JOBS[job_id]["logs"].append(f"Model ready. Commencing {mode_name} latent synthesis...")
+        JOBS[job_id]["progress"] = 35
+        JOBS[job_id]["logs"].append(f"Model ready. Commencing {mode_name} latent synthesis ({duration}s target)...")
 
         output_filename = f"gen_{uuid.uuid4().hex[:8]}.mp4"
         output_filepath = os.path.join(config.OUTPUTS_DIR, output_filename)
@@ -84,6 +85,7 @@ def run_single_job(
             device=device,
             output_path=output_filepath,
             model_name=model_name,
+            duration=duration,
         )
 
         JOBS[job_id]["progress"] = 100
@@ -96,14 +98,14 @@ def run_single_job(
         JOBS[job_id]["error"] = str(e)
         JOBS[job_id]["logs"].append(f"Generation failed: {str(e)}")
 
-def run_multi_job(job_id: str, scenes: list, model_name: str, steps: int, frames: int, fps: int):
+def run_multi_job(job_id: str, scenes: list, model_name: str, steps: int, frames: int, fps: int, duration: int = 60):
     try:
         # Check if any scene uses an image
         has_any_image = any(sc.get("image") and os.path.exists(sc.get("image")) for sc in scenes)
 
         JOBS[job_id]["status"] = "running"
         JOBS[job_id]["progress"] = 15
-        JOBS[job_id]["logs"].append(f"Preparing multi-scene pipeline with {len(scenes)} scenes...")
+        JOBS[job_id]["logs"].append(f"Preparing multi-scene pipeline ({len(scenes)} scenes, {duration}s target)...")
 
         device = config.get_device()
         pipe = get_cached_pipeline(model_name, device, is_image_to_video=has_any_image)
@@ -123,6 +125,7 @@ def run_multi_job(job_id: str, scenes: list, model_name: str, steps: int, frames
             frames=frames,
             device=device,
             model_name=model_name,
+            duration=duration,
         )
 
         JOBS[job_id]["progress"] = 100
@@ -151,6 +154,7 @@ async def api_generate_single(
     prompt: str = Form(...),
     negative_prompt: str = Form(config.DEFAULT_NEGATIVE_PROMPT),
     model: str = Form("ltx"),
+    duration: int = Form(5),
     steps: int = Form(30),
     frames: int = Form(81),
     fps: int = Form(25),
@@ -187,6 +191,7 @@ async def api_generate_single(
         steps=steps,
         frames=frames,
         fps=fps,
+        duration=duration,
     )
 
     return {"job_id": job_id, "status": "queued"}
@@ -197,6 +202,7 @@ async def api_generate_scenes(
     scenes_json: str = Form(...),
     images: List[UploadFile] = File([]),
     model: str = Form("ltx"),
+    duration: int = Form(60),
     steps: int = Form(30),
     frames: int = Form(81),
     fps: int = Form(25),
@@ -232,7 +238,7 @@ async def api_generate_scenes(
         "id": job_id,
         "status": "queued",
         "progress": 5,
-        "logs": [f"Multi-scene job queued ({len(prepared_scenes)} scenes)."],
+        "logs": [f"Multi-scene job queued ({len(prepared_scenes)} scenes, {duration}s target)."],
         "video_url": None,
         "error": None,
     }
@@ -245,6 +251,7 @@ async def api_generate_scenes(
         steps=steps,
         frames=frames,
         fps=fps,
+        duration=duration,
     )
 
     return {"job_id": job_id, "status": "queued"}

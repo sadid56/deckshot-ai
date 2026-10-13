@@ -1,6 +1,10 @@
 import React, { useRef } from 'react';
-import { Card, Box, Typography, Stack, TextField, Chip, IconButton } from '@mui/material';
-import { CloudUpload as CloudUploadIcon, Clear as ClearIcon } from '@mui/icons-material';
+import { Card, Box, Typography, Stack, TextField, IconButton } from '@mui/material';
+import {
+  CloudUploadOutlined as CloudUploadIcon,
+  Close as CloseIcon,
+} from '@mui/icons-material';
+import { studioTokens } from '../theme/theme';
 
 interface SingleSceneTabProps {
   imageFile: File | null;
@@ -28,14 +32,31 @@ export const SingleSceneTab: React.FC<SingleSceneTabProps> = ({
   };
 
   return (
-    <Card sx={{ p: 2.5 }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, color: '#f8fafc' }}>
-        Reference Image (Optional)
-      </Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-        Upload an image for Image-to-Video, or leave empty to generate purely from text prompt (Text-to-Video).
-      </Typography>
-
+    <Card sx={{ p: 3, bgcolor: studioTokens.bgPanel, border: `1px solid ${studioTokens.borderDefault}` }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+        <Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: studioTokens.textPrimary }}>
+            Reference Image
+          </Typography>
+          <Typography variant="caption" sx={{ color: studioTokens.textMuted, display: 'block' }}>
+            Upload an image to animate (Image-to-Video) or leave empty for direct prompt (Text-to-Video).
+          </Typography>
+        </Box>
+        <Box
+          sx={{
+            px: 1,
+            py: 0.2,
+            borderRadius: 1,
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            bgcolor: studioTokens.bgSubtle,
+            color: studioTokens.textSecondary,
+            border: `1px solid ${studioTokens.borderDefault}`,
+          }}
+        >
+          OPTIONAL
+        </Box>
+      </Box>
 
       {/* Upload Dropzone */}
       <Box
@@ -43,9 +64,9 @@ export const SingleSceneTab: React.FC<SingleSceneTabProps> = ({
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
         sx={{
-          border: '2px dashed rgba(255,255,255,0.15)',
-          borderRadius: 2.5,
-          bgcolor: 'rgba(14,16,25,0.85)',
+          border: `1px dashed ${studioTokens.borderDefault}`,
+          borderRadius: 2,
+          bgcolor: studioTokens.bgInput,
           minHeight: 180,
           display: 'flex',
           alignItems: 'center',
@@ -53,8 +74,11 @@ export const SingleSceneTab: React.FC<SingleSceneTabProps> = ({
           cursor: 'pointer',
           position: 'relative',
           overflow: 'hidden',
-          transition: 'all 0.2s',
-          '&:hover': { borderColor: '#6366f1', bgcolor: 'rgba(99,102,241,0.04)' },
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            borderColor: studioTokens.primary,
+            bgcolor: studioTokens.bgSubtle,
+          },
         }}
       >
         <input
@@ -71,7 +95,7 @@ export const SingleSceneTab: React.FC<SingleSceneTabProps> = ({
               position: 'relative',
               width: '100%',
               height: 220,
-              bgcolor: '#000',
+              bgcolor: studioTokens.bgInput,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -91,32 +115,47 @@ export const SingleSceneTab: React.FC<SingleSceneTabProps> = ({
               }}
               sx={{
                 position: 'absolute',
-                top: 10,
-                right: 10,
-                bgcolor: 'rgba(0,0,0,0.7)',
-                '&:hover': { bgcolor: '#ef4444' },
+                top: 8,
+                right: 8,
+                bgcolor: 'rgba(0, 0, 0, 0.75)',
+                color: studioTokens.textPrimary,
+                border: `1px solid ${studioTokens.borderDefault}`,
+                '&:hover': { bgcolor: studioTokens.error },
               }}
             >
-              <ClearIcon fontSize="small" />
+              <CloseIcon fontSize="small" />
             </IconButton>
           </Box>
         ) : (
-          <Stack spacing={1} sx={{ p: 2, alignItems: 'center' }}>
-            <CloudUploadIcon sx={{ fontSize: 40, color: '#6366f1' }} />
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              Click or drag & drop your reference image
+          <Stack spacing={1.2} sx={{ p: 3, alignItems: 'center' }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                bgcolor: studioTokens.bgElevated,
+                border: `1px solid ${studioTokens.borderDefault}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <CloudUploadIcon sx={{ fontSize: 24, color: studioTokens.primaryLight }} />
+            </Box>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: studioTokens.textPrimary }}>
+              Drag & drop image here or click to browse
             </Typography>
-            <Typography variant="caption" color="text.secondary">
-              PNG, JPG, WebP supported
+            <Typography variant="caption" sx={{ color: studioTokens.textMuted, fontSize: '0.75rem' }}>
+              PNG, JPG, WebP • Generates Text-to-Video if omitted
             </Typography>
           </Stack>
         )}
       </Box>
 
-      {/* Motion Prompt */}
+      {/* Motion & Video Prompt */}
       <Box sx={{ mt: 3 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-          Motion & Cinematic Prompt
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: studioTokens.textPrimary }}>
+          Motion & Video Prompt
         </Typography>
         <TextField
           fullWidth
@@ -125,26 +164,15 @@ export const SingleSceneTab: React.FC<SingleSceneTabProps> = ({
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value)}
           placeholder="Describe how the camera pans, light sweeps, or product reveals..."
-          sx={{ bgcolor: 'rgba(14,16,25,0.85)', borderRadius: 2 }}
+          variant="outlined"
+          sx={{
+            '& .MuiInputBase-root': {
+              fontSize: '0.92rem',
+              lineHeight: 1.6,
+              bgcolor: studioTokens.bgInput,
+            },
+          }}
         />
-
-        {/* Prompt helper chips */}
-        <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
-          {[
-            { label: 'Orbit Pan', text: 'Slow 360-degree orbit around the subject, dramatic volumetric lighting.' },
-            { label: 'Macro Zoom', text: 'Camera zooms slowly into high-tech details, soft glossy reflections.' },
-            { label: 'Side Reveal', text: 'Cinematic side tracking shot, studio spotlight reveal.' },
-          ].map((chip) => (
-            <Chip
-              key={chip.label}
-              label={chip.label}
-              size="small"
-              onClick={() => onPromptChange(`${prompt.trim()} ${chip.text}`)}
-              clickable
-              sx={{ fontSize: '0.75rem', bgcolor: 'rgba(255,255,255,0.04)' }}
-            />
-          ))}
-        </Stack>
       </Box>
     </Card>
   );

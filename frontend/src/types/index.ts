@@ -13,6 +13,7 @@ export interface RecentVideo {
 
 export interface GenerationSettings {
   model: string;
+  duration: number; // Duration in seconds (5, 10, 30, 60, 120)
   frames: number;
   steps: number;
   fps: number;

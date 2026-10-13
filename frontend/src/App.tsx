@@ -4,25 +4,24 @@ import {
   CssBaseline,
   Box,
   Container,
-  Tabs,
-  Tab,
   Button,
   Stack,
   Alert,
 } from '@mui/material';
 import {
-  Movie as MovieIcon,
-  ViewCarousel as ViewCarouselIcon,
-  AutoAwesome as AutoAwesomeIcon,
+  VideoCameraBackOutlined as MovieIcon,
+  ViewCarouselOutlined as ViewCarouselIcon,
+  MovieCreationOutlined as MovieCreationIcon,
+  Tune as TuneIcon,
 } from '@mui/icons-material';
 
-import { darkTheme } from './theme/theme';
+import { darkTheme, studioTokens } from './theme/theme';
 import type { SceneItem, RecentVideo, GenerationSettings } from './types';
 
 import { Header } from './components/Header';
 import { SingleSceneTab } from './components/SingleSceneTab';
 import { MultiSceneTab } from './components/MultiSceneTab';
-import { AdvancedSettings } from './components/AdvancedSettings';
+import { EngineSettingsDrawer } from './components/EngineSettingsDrawer';
 import { ProgressCard } from './components/ProgressCard';
 import { VideoStage } from './components/VideoStage';
 import { RecentGenerations } from './components/RecentGenerations';
@@ -30,33 +29,33 @@ import { RecentGenerations } from './components/RecentGenerations';
 export default function App() {
   const [tabIndex, setTabIndex] = useState<number>(0);
   const [hardware, setHardware] = useState<string>('LOCAL ACCELERATOR');
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
-  // Single Scene State (NO sample images - requires user upload)
+  // Single Scene State
   const [singleImageFile, setSingleImageFile] = useState<File | null>(null);
   const [singleImagePreview, setSingleImagePreview] = useState<string>('');
-  const [prompt, setPrompt] = useState<string>(
-    'Cinematic commercial product showcase. Smooth camera movement with elegant studio lighting, subtle light reflections across the surface, premium luxury presentation, high-definition details.'
-  );
+  const [prompt, setPrompt] = useState<string>('');
 
-  // Multi-Scene State (Empty initial scenes awaiting user uploads)
+  // Multi-Scene State
   const [scenes, setScenes] = useState<SceneItem[]>([
     {
       id: 1,
       file: null,
       imagePreview: '',
-      prompt: 'Cinematic slow camera pan around the subject with elegant studio lighting.',
+      prompt: '',
     },
     {
       id: 2,
       file: null,
       imagePreview: '',
-      prompt: 'Macro zoom into intricate details, high-tech display animation with soft reflections.',
+      prompt: '',
     },
   ]);
 
   // Generation Settings
   const [settings, setSettings] = useState<GenerationSettings>({
     model: 'ltx',
+    duration: 5,
     frames: 81,
     steps: 30,
     fps: 25,
@@ -129,7 +128,7 @@ export default function App() {
         id: nextId,
         file: null,
         imagePreview: '',
-        prompt: 'Smooth cinematic reveal angle with elegant volumetric lighting.',
+        prompt: '',
       },
     ]);
   };
@@ -159,7 +158,7 @@ export default function App() {
   const handleGenerate = async () => {
     setErrorMessage(null);
 
-    // Validation: Prompt is required; Image is optional
+    // Validation
     if (tabIndex === 0) {
       if (!prompt.trim()) {
         setErrorMessage('Please provide a prompt describing your video.');
@@ -180,6 +179,7 @@ export default function App() {
 
     const formData = new FormData();
     formData.append('model', settings.model);
+    formData.append('duration', (settings.duration || 5).toString());
     formData.append('steps', settings.steps.toString());
     formData.append('frames', settings.frames.toString());
     formData.append('fps', settings.fps.toString());
@@ -196,7 +196,6 @@ export default function App() {
       endpoint = '/api/generate-scenes';
       const scenesPayload = scenes.map((s) => {
         let filename = '';
-
         if (s.file) {
           filename = s.file.name;
           formData.append('images', s.file, filename);
@@ -205,7 +204,6 @@ export default function App() {
       });
       formData.append('scenes_json', JSON.stringify(scenesPayload));
     }
-
 
     try {
       const res = await fetch(endpoint, { method: 'POST', body: formData });
@@ -256,14 +254,15 @@ export default function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
-      <div className="ambient-glow-1" />
-      <div className="ambient-glow-2" />
 
-      {/* Header */}
-      <Header hardware={hardware} />
+      {/* Header with Settings Trigger */}
+      <Header
+        hardware={hardware}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
 
       {/* Main Studio Body */}
-      <Container maxWidth="xl" sx={{ py: 4, position: 'relative', zIndex: 1 }}>
+      <Container maxWidth="xl" sx={{ py: 3.5 }}>
         {/* Error Alert */}
         {errorMessage && (
           <Alert severity="error" onClose={() => setErrorMessage(null)} sx={{ mb: 3 }}>
@@ -271,38 +270,92 @@ export default function App() {
           </Alert>
         )}
 
-        {/* Mode Selector Tabs */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-          <Tabs
-            value={tabIndex}
-            onChange={(_, val) => setTabIndex(val)}
+        {/* Studio Top Bar: Mode Switcher + Quick Engine Specs Badge */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 3.5,
+            flexWrap: 'wrap',
+            gap: 2,
+          }}
+        >
+          {/* Segmented Mode Selector */}
+          <Box
             sx={{
-              bgcolor: '#10121a',
-              p: 0.5,
-              borderRadius: 3,
-              border: '1px solid rgba(255,255,255,0.08)',
-              '& .MuiTabs-indicator': { display: 'none' },
-              '& .MuiTab-root': {
-                borderRadius: 2.5,
+              display: 'inline-flex',
+              bgcolor: studioTokens.bgPanel,
+              p: 0.6,
+              borderRadius: 2.5,
+              border: `1px solid ${studioTokens.borderDefault}`,
+              gap: 0.5,
+            }}
+          >
+            <Button
+              onClick={() => setTabIndex(0)}
+              startIcon={<MovieIcon sx={{ fontSize: 18 }} />}
+              sx={{
+                px: 2.5,
+                py: 0.8,
+                borderRadius: 2,
                 fontWeight: 600,
-                color: '#94a3b8',
-                minHeight: 44,
-                px: 3,
-                '&.Mui-selected': {
-                  bgcolor: '#6366f1',
-                  color: '#fff',
-                  boxShadow: '0 4px 15px rgba(99,102,241,0.4)',
+                fontSize: '0.88rem',
+                color: tabIndex === 0 ? studioTokens.textPrimary : studioTokens.textMuted,
+                bgcolor: tabIndex === 0 ? studioTokens.bgElevated : 'transparent',
+                border: tabIndex === 0 ? `1px solid ${studioTokens.borderDefault}` : '1px solid transparent',
+                '&:hover': {
+                  bgcolor: tabIndex === 0 ? studioTokens.bgElevated : studioTokens.bgSubtle,
                 },
+              }}
+            >
+              Single Scene (Text / Image to Video)
+            </Button>
+            <Button
+              onClick={() => setTabIndex(1)}
+              startIcon={<ViewCarouselIcon sx={{ fontSize: 18 }} />}
+              sx={{
+                px: 2.5,
+                py: 0.8,
+                borderRadius: 2,
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                color: tabIndex === 1 ? studioTokens.textPrimary : studioTokens.textMuted,
+                bgcolor: tabIndex === 1 ? studioTokens.bgElevated : 'transparent',
+                border: tabIndex === 1 ? `1px solid ${studioTokens.borderDefault}` : '1px solid transparent',
+                '&:hover': {
+                  bgcolor: tabIndex === 1 ? studioTokens.bgElevated : studioTokens.bgSubtle,
+                },
+              }}
+            >
+              Multi-Scene Storyboard
+            </Button>
+          </Box>
+
+          {/* Quick Engine Specs Button (Opens Right Drawer) */}
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<TuneIcon sx={{ fontSize: 16 }} />}
+            onClick={() => setIsSettingsOpen(true)}
+            sx={{
+              height: 40,
+              px: 2,
+              borderRadius: 2.5,
+              fontSize: '0.82rem',
+              fontWeight: 500,
+              borderColor: studioTokens.borderDefault,
+              color: studioTokens.textSecondary,
+              bgcolor: studioTokens.bgPanel,
+              '&:hover': {
+                borderColor: studioTokens.primary,
+                color: studioTokens.textPrimary,
+                bgcolor: studioTokens.bgSubtle,
               },
             }}
           >
-            <Tab icon={<MovieIcon sx={{ fontSize: 20 }} />} iconPosition="start" label="Single Scene (Product Ad)" />
-            <Tab
-              icon={<ViewCarouselIcon sx={{ fontSize: 20 }} />}
-              iconPosition="start"
-              label="Multi-Scene (Storyboard Presentation)"
-            />
-          </Tabs>
+            {settings.model.toUpperCase()} • {settings.duration >= 60 ? `${settings.duration / 60} Min` : `${settings.duration}s`} Video
+          </Button>
         </Box>
 
         {/* 2-Column Grid Layout */}
@@ -335,29 +388,27 @@ export default function App() {
               />
             )}
 
-            {/* Advanced Settings */}
-            <AdvancedSettings settings={settings} onUpdate={handleUpdateSetting} />
-
-            {/* Primary Generate Button */}
+            {/* Primary Generate Button (Directly below Creator Controls) */}
             <Button
               variant="contained"
               size="large"
               disabled={isGenerating}
               onClick={handleGenerate}
-              startIcon={<AutoAwesomeIcon />}
+              startIcon={<MovieCreationIcon />}
               sx={{
-                py: 1.8,
-                fontSize: '1.05rem',
-                fontWeight: 700,
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%)',
-                boxShadow: '0 8px 30px rgba(99,102,241,0.45)',
+                py: 1.6,
+                fontSize: '0.98rem',
+                fontWeight: 600,
+                letterSpacing: '0.01em',
+                borderRadius: 2,
+                bgcolor: studioTokens.primary,
+                border: `1px solid ${studioTokens.borderDefault}`,
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%)',
-                  boxShadow: '0 12px 35px rgba(99,102,241,0.6)',
+                  bgcolor: studioTokens.primaryHover,
                 },
               }}
             >
-              {isGenerating ? 'Rendering Video in Studio...' : 'Generate Cinematic Video'}
+              {isGenerating ? 'Rendering Video in Studio...' : 'Render Cinematic Video'}
             </Button>
           </Stack>
 
@@ -378,6 +429,14 @@ export default function App() {
           </Stack>
         </Box>
       </Container>
+
+      {/* Right Slide-out Drawer for Engine Settings */}
+      <EngineSettingsDrawer
+        open={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={settings}
+        onUpdate={handleUpdateSetting}
+      />
     </ThemeProvider>
   );
 }

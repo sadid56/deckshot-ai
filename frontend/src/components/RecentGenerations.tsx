@@ -1,9 +1,11 @@
 import { Card, Box, Typography, Tooltip, IconButton, Stack, Chip } from '@mui/material';
-import { Refresh as RefreshIcon } from '@mui/icons-material';
+import {
+  Refresh as RefreshIcon,
+  MovieCreationOutlined as MovieIcon,
+  VideoLibraryOutlined as LibraryIcon,
+} from '@mui/icons-material';
 import type { RecentVideo } from '../types';
-
-
-
+import { studioTokens } from '../theme/theme';
 
 interface RecentGenerationsProps {
   recentVideos: RecentVideo[];
@@ -19,34 +21,53 @@ export const RecentGenerations: React.FC<RecentGenerationsProps> = ({
   onRefresh,
 }) => {
   return (
-    <Card sx={{ p: 2 }}>
+    <Card sx={{ p: 2.2, bgcolor: studioTokens.bgPanel, border: `1px solid ${studioTokens.borderDefault}` }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-        <Typography variant="caption" sx={{ fontWeight: 700, color: '#94a3b8' }}>
-          RECENT GENERATIONS
-        </Typography>
-        <Tooltip title="Refresh History">
-          <IconButton size="small" onClick={onRefresh} sx={{ color: '#64748b' }}>
-            <RefreshIcon fontSize="small" />
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <LibraryIcon sx={{ fontSize: 16, color: studioTokens.primaryLight }} />
+          <Typography
+            variant="caption"
+            sx={{
+              fontWeight: 700,
+              color: studioTokens.textSecondary,
+              letterSpacing: '0.06em',
+              fontSize: '0.72rem',
+            }}
+          >
+            RECENT RENDERS ({recentVideos.length})
+          </Typography>
+        </Stack>
+        <Tooltip title="Refresh Assets">
+          <IconButton size="small" onClick={onRefresh} sx={{ color: studioTokens.textMuted }}>
+            <RefreshIcon sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
       </Box>
 
       <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 0.5 }}>
         {recentVideos.length === 0 ? (
-          <Typography variant="caption" color="text.secondary">
-            No rendered videos yet
+          <Typography variant="caption" sx={{ color: studioTokens.textMuted, fontStyle: 'italic' }}>
+            No rendered videos in session yet
           </Typography>
         ) : (
           recentVideos.map((vid) => (
             <Chip
               key={vid.filename}
+              icon={<MovieIcon sx={{ fontSize: 14 }} />}
               label={vid.filename}
               clickable
               onClick={() => onSelectVideo(vid.url)}
-              variant={currentVideoUrl === vid.url ? 'filled' : 'outlined'}
-              color={currentVideoUrl === vid.url ? 'primary' : 'default'}
               size="small"
-              sx={{ fontSize: '0.75rem', flexShrink: 0 }}
+              sx={{
+                fontSize: '0.75rem',
+                flexShrink: 0,
+                bgcolor: currentVideoUrl === vid.url ? studioTokens.bgElevated : studioTokens.bgInput,
+                color: currentVideoUrl === vid.url ? studioTokens.primaryLight : studioTokens.textSecondary,
+                border: currentVideoUrl === vid.url ? `1px solid ${studioTokens.primary}` : `1px solid ${studioTokens.borderDefault}`,
+                '&:hover': {
+                  bgcolor: studioTokens.bgSubtle,
+                },
+              }}
             />
           ))
         )}
