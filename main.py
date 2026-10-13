@@ -3,7 +3,6 @@ import sys
 import json
 import argparse
 from config import (
-    DEFAULT_IMAGE,
     DEFAULT_PROMPT,
     DEFAULT_NEGATIVE_PROMPT,
     DEFAULT_MODEL,
@@ -13,12 +12,15 @@ from config import (
     DEFAULT_FPS,
     get_device,
 )
+from src.models import ModelRegistry
 from src.pipeline import load_video_pipeline
 from src.generator import generate_single_video, generate_multi_scene_video
 
+
 def parse_arguments():
+    registered_models = [m["id"] for m in ModelRegistry.list_models()]
     parser = argparse.ArgumentParser(
-        description="Video AI: Professional Image-to-Video and Multi-Scene Presentation Generator"
+        description="DeckShot AI: Professional Presentation & Video Diffusion Studio"
     )
     parser.add_argument(
         "--image",
@@ -26,7 +28,6 @@ def parse_arguments():
         default=None,
         help="Path to input reference image (optional, leave empty for Text-to-Video)",
     )
-
     parser.add_argument(
         "--prompt",
         type=str,
@@ -40,9 +41,31 @@ def parse_arguments():
         help="Negative prompt to suppress visual artifacts",
     )
     parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_MODEL,
+        help=f"AI video model engine (Registered: {', '.join(registered_models)})",
+    )
+    parser.add_argument(
+        "--list-models",
+        action="store_true",
+        help="Display all registered video model engines, specs, and dependency status",
+    )
+    parser.add_argument(
+        "--install-deps",
+        action="store_true",
+        help="Automatically install model-specific Python dependencies for the selected --model",
+    )
+    parser.add_argument(
         "--download-only",
         action="store_true",
         help="Pre-download and cache model weights from Hugging Face without running video generation",
+    )
+    parser.add_argument(
+        "--duration",
+        type=int,
+        default=5,
+        help="Target video duration in seconds (5, 10, 30, 60, 120)",
     )
     parser.add_argument(
         "--scenes",
@@ -55,13 +78,6 @@ def parse_arguments():
         nargs="+",
         default=None,
         help="List of multiple image paths to animate sequentially into a presentation",
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default=DEFAULT_MODEL,
-        choices=["ltx", "cogvideox"],
-        help="AI video model architecture: 'ltx' (recommended for Mac/consumer GPU) or 'cogvideox'",
     )
     parser.add_argument(
         "--output",
@@ -79,7 +95,7 @@ def parse_arguments():
         "--frames",
         type=int,
         default=DEFAULT_FRAMES,
-        help=f"Frames per clip (default: {DEFAULT_FRAMES}; for LTX use 49, 81, 121, or 161)",
+        help=f"Frames per clip (default: {DEFAULT_FRAMES})",
     )
     parser.add_argument(
         "--fps",
@@ -89,26 +105,62 @@ def parse_arguments():
     )
     return parser.parse_args()
 
+
+def display_registered_models():
+    models = ModelRegistry.list_models()
+    print("\n==========================================================================")
+    print("🎬 DeckShot AI: Registered Model Engines")
+    print("==========================================================================")
+    for m in models:
+        status = "✅ Ready" if m["installed"] else "⚠️  Missing Dependencies (run --install-deps)"
+        print(f"\n🔹 Model ID:     {m['id']}")
+        print(f"   Name:         {m['name']}")
+        print(f"   Status:       {status}")
+        print(f"   Default FPS:  {m['default_fps']} FPS")
+        print(f"   Hardware:     {m['recommended_hardware']}")
+        print(f"   Description:  {m['description']}")
+        print(f"   Dependencies: {', '.join(m['dependencies'])}")
+    print("\n==========================================================================")
+
+
 def main():
     args = parse_arguments()
+
+    if args.list_models:
+        display_registered_models()
+        return
+
+    if args.install_deps:
+        print(f"\n📦 Installing dependencies for engine '{args.model}'...")
+        success = ModelRegistry.install(args.model)
+        if success:
+            print(f"✅ Engine '{args.model}' is ready to run!")
+        else:
+            print(f"❌ Failed to install dependencies for '{args.model}'.")
+            sys.exit(1)
+        return
+
     device = get_device()
+    engine = ModelRegistry.get(args.model)
 
     print("==================================================")
-    print("🎬 Video AI: Presentation & Ad Generator")
+    print("🎬 DeckShot AI: Video Production Studio")
     print(f"🖥️  Compute Device: {device.upper()}")
-    print(f"📦 Model Engine:    {args.model.upper()}")
+    print(f"📦 Model Engine:    {engine.name}")
+    print(f"⏱️  Duration:        {args.duration}s")
     print(f"📁 Target Output:   {args.output}")
     print("==================================================")
 
+    # Check dependencies before loading
+    if not engine.is_installed():
+        print(f"⚠️  Missing dependencies for '{engine.id}'. Installing now...")
+        engine.install_dependencies()
+
     if args.download_only:
-        print("\n📥 Pre-downloading model weights to Hugging Face cache (~/.cache/huggingface)...")
-        print("➡️  [1/2] Fetching Text-to-Video pipeline...")
-        load_video_pipeline(model_name=args.model, device=device, is_image_to_video=False)
-        print("➡️  [2/2] Fetching Image-to-Video pipeline...")
-        load_video_pipeline(model_name=args.model, device=device, is_image_to_video=True)
+        print(f"\n📥 Pre-downloading model weights for '{engine.id}' to local cache...")
+        ModelRegistry.download(args.model, device=device)
         print("\n==================================================")
-        print("✅ All model weights successfully downloaded and cached locally!")
-        print("You can now run DeckShot AI completely offline without waiting.")
+        print("✅ Model weights successfully downloaded and cached locally!")
         print("==================================================")
         return
 
@@ -122,7 +174,7 @@ def main():
             sys.exit(1)
         with open(args.scenes, "r") as f:
             scenes = json.load(f)
-        
+
         generate_multi_scene_video(
             pipe=pipe,
             scenes=scenes,
@@ -132,10 +184,12 @@ def main():
             frames=args.frames,
             device=device,
             model_name=args.model,
+            duration=args.duration,
         )
+        return
 
-    # Case 2: Multi-scene via list of images from CLI
-    elif args.images and len(args.images) > 1:
+    # Case 2: Multi-scene via multiple images
+    if args.images:
         scenes = [{"image": img_path, "prompt": args.prompt} for img_path in args.images]
         generate_multi_scene_video(
             pipe=pipe,
@@ -146,26 +200,24 @@ def main():
             frames=args.frames,
             device=device,
             model_name=args.model,
+            duration=args.duration,
         )
+        return
 
-    # Case 3: Single-video generation (Text-to-Video or Image-to-Video)
-    else:
-        active_image = args.image if (args.image and os.path.exists(args.image)) else None
-        generate_single_video(
-            pipe=pipe,
-            image_path=active_image,
-            prompt=args.prompt,
-            negative_prompt=args.negative_prompt,
-            steps=args.steps,
-            frames=args.frames,
-            fps=args.fps,
-            device=device,
-            output_path=args.output,
-            model_name=args.model,
-        )
-
-    print("\n🎉 Process completed successfully!")
-    print(f"Generated video available at: {os.path.abspath(args.output)}")
+    # Case 3: Single Scene (Image-to-Video or Text-to-Video)
+    generate_single_video(
+        pipe=pipe,
+        image_path=args.image,
+        prompt=args.prompt,
+        negative_prompt=args.negative_prompt,
+        steps=args.steps,
+        frames=args.frames,
+        fps=args.fps,
+        device=device,
+        output_path=args.output,
+        model_name=args.model,
+        duration=args.duration,
+    )
 
 
 if __name__ == "__main__":

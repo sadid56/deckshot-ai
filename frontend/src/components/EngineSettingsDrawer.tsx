@@ -1,5 +1,18 @@
-import React from "react";
-import { Drawer, Box, Stack, Typography, IconButton, Select, MenuItem, TextField, Button, Divider } from "@mui/material";
+import React, { useState, useEffect } from "react";
+import {
+  Drawer,
+  Box,
+  Stack,
+  Typography,
+  IconButton,
+  Select,
+  MenuItem,
+  TextField,
+  Button,
+  Divider,
+  Chip,
+  CircularProgress,
+} from "@mui/material";
 import {
   Close as CloseIcon,
   Tune as TuneIcon,
@@ -9,9 +22,12 @@ import {
   SmartDisplayOutlined as ModelIcon,
   FilterAltOutlined as FilterIcon,
   AspectRatioOutlined as AspectRatioIcon,
+  DownloadDoneOutlined as InstalledIcon,
+  CloudDownloadOutlined as DownloadIcon,
 } from "@mui/icons-material";
-import type { GenerationSettings } from "../types";
+import type { GenerationSettings, ModelInfo } from "../types";
 import { studioTokens } from "../theme/theme";
+import { useToast } from "../context/ToastContext";
 
 interface EngineSettingsDrawerProps {
   open: boolean;
@@ -31,10 +47,63 @@ const DEFAULT_SETTINGS: GenerationSettings = {
 };
 
 export const EngineSettingsDrawer: React.FC<EngineSettingsDrawerProps> = ({ open, onClose, settings, onUpdate }) => {
+  const toast = useToast();
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [isInstalling, setIsInstalling] = useState<boolean>(false);
+
+  const fetchModels = async () => {
+    try {
+      const res = await fetch("/api/models");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setModels(data);
+        }
+      }
+    } catch {
+      // Keep defaults if server is initializing
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchModels();
+    }
+  }, [open]);
+
   const handleReset = () => {
     Object.entries(DEFAULT_SETTINGS).forEach(([key, val]) => {
       onUpdate(key as keyof GenerationSettings, val);
     });
+  };
+
+  const handleModelChange = (modelId: string) => {
+    onUpdate("model", modelId);
+    const selected = models.find((m) => m.id === modelId);
+    if (selected) {
+      if (selected.default_fps) onUpdate("fps", selected.default_fps);
+      if (selected.default_steps) onUpdate("steps", selected.default_steps);
+      if (selected.default_frames) onUpdate("frames", selected.default_frames);
+    }
+  };
+
+  const handleInstallDependencies = async (modelId: string) => {
+    setIsInstalling(true);
+    toast.info(`Installing Python dependencies for ${modelId.toUpperCase()}...`);
+    try {
+      const res = await fetch(`/api/models/${modelId}/install`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.installed) {
+        toast.success(`Dependencies for ${modelId.toUpperCase()} installed successfully!`);
+        await fetchModels();
+      } else {
+        toast.error(`Installation failed: ${data.detail || "Unknown error"}`);
+      }
+    } catch (e: any) {
+      toast.error(`Install error: ${e.message || "Failed to reach backend"}`);
+    } finally {
+      setIsInstalling(false);
+    }
   };
 
   const handleDurationChange = (durationSec: number) => {
@@ -48,6 +117,8 @@ export const EngineSettingsDrawer: React.FC<EngineSettingsDrawerProps> = ({ open
       onUpdate("frames", 121);
     }
   };
+
+  const selectedModel = models.find((m) => m.id === settings.model);
 
   return (
     <Drawer
@@ -119,21 +190,62 @@ export const EngineSettingsDrawer: React.FC<EngineSettingsDrawerProps> = ({ open
 
       <Divider sx={{ borderColor: studioTokens.borderDefault, mb: 3 }} />
 
-      {/* 3 Simple Settings Controls */}
+      {/* Settings Controls */}
       <Stack spacing={3}>
-        {/* 1. AI Video Model */}
+        {/* 1. AI Video Model (Dynamic from backend) */}
         <Box>
-          <Stack direction='row' spacing={1} sx={{ alignItems: "center", mb: 0.8 }}>
-            <ModelIcon sx={{ fontSize: 17, color: studioTokens.primaryLight }} />
-            <Typography variant='body2' sx={{ fontWeight: 700, color: studioTokens.textPrimary }}>
-              AI Video Model
-            </Typography>
+          <Stack direction='row' spacing={1} sx={{ alignItems: "center", mb: 0.8, justifyContent: "space-between" }}>
+            <Stack direction='row' spacing={1} sx={{ alignItems: "center" }}>
+              <ModelIcon sx={{ fontSize: 17, color: studioTokens.primaryLight }} />
+              <Typography variant='body2' sx={{ fontWeight: 700, color: studioTokens.textPrimary }}>
+                AI Video Model
+              </Typography>
+            </Stack>
+            {selectedModel && (
+              <Chip
+                size='small'
+                label={selectedModel.installed ? "Ready" : "Deps Missing"}
+                icon={
+                  selectedModel.installed ? (
+                    <InstalledIcon sx={{ fontSize: "14px !important" }} />
+                  ) : (
+                    <DownloadIcon sx={{ fontSize: "14px !important" }} />
+                  )
+                }
+                sx={{
+                  height: 20,
+                  fontSize: "0.7rem",
+                  bgcolor: selectedModel.installed ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                  color: selectedModel.installed ? "#34d399" : "#fbbf24",
+                  border: `1px solid ${selectedModel.installed ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)"}`,
+                }}
+              />
+            )}
           </Stack>
           <Select
             fullWidth
             size='small'
             value={settings.model}
-            onChange={(e) => onUpdate("model", e.target.value)}
+            onChange={(e) => handleModelChange(e.target.value)}
+            renderValue={(val) => {
+              const m = models.find((item) => item.id === val);
+              return (
+                <Typography
+                  noWrap
+                  sx={{
+                    fontSize: "0.86rem",
+                    fontWeight: 600,
+                    color: studioTokens.textPrimary,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    display: "block",
+                  }}
+                >
+                  {m ? m.name : val}
+                </Typography>
+              );
+            }}
             MenuProps={{
               anchorOrigin: { vertical: "bottom", horizontal: "left" },
               transformOrigin: { vertical: "top", horizontal: "left" },
@@ -161,15 +273,72 @@ export const EngineSettingsDrawer: React.FC<EngineSettingsDrawerProps> = ({ open
               border: `1px solid ${studioTokens.borderDefault}`,
               "& .MuiOutlinedInput-notchedOutline": { border: "none" },
               "&:hover": { borderColor: "rgba(255, 255, 255, 0.2)" },
+              "& .MuiSelect-select": {
+                py: 1,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              },
             }}
           >
-            <MenuItem value='ltx' sx={{ fontSize: "0.85rem" }}>
-              Lightricks/LTX-Video (25 FPS - Recommended)
-            </MenuItem>
-            <MenuItem value='cogvideox' sx={{ fontSize: "0.85rem" }}>
-              THUDM/CogVideoX-5B-I2V
-            </MenuItem>
+            {models.map((m) => (
+              <MenuItem
+                key={m.id}
+                value={m.id}
+                sx={{
+                  fontSize: "0.85rem",
+                  py: 1,
+                  borderRadius: 1,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  display: "block",
+                }}
+              >
+                <Typography
+                  noWrap
+                  sx={{
+                    fontSize: "0.85rem",
+                    fontWeight: 500,
+                    color: studioTokens.textPrimary,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    display: "block",
+                    width: "100%",
+                  }}
+                >
+                  {m.name}
+                </Typography>
+              </MenuItem>
+            ))}
           </Select>
+
+          {/* If selected model dependencies need installing */}
+          {selectedModel && !selectedModel.installed && (
+            <Button
+              variant='outlined'
+              size='small'
+              fullWidth
+              disabled={isInstalling}
+              onClick={() => handleInstallDependencies(selectedModel.id)}
+              startIcon={isInstalling ? <CircularProgress size={14} color='inherit' /> : <DownloadIcon sx={{ fontSize: 16 }} />}
+              sx={{
+                mt: 1,
+                py: 0.6,
+                fontSize: "0.75rem",
+                color: "#fbbf24",
+                borderColor: "rgba(245, 158, 11, 0.4)",
+                bgcolor: "rgba(245, 158, 11, 0.08)",
+                "&:hover": {
+                  bgcolor: "rgba(245, 158, 11, 0.15)",
+                  borderColor: "#fbbf24",
+                },
+              }}
+            >
+              {isInstalling ? "Installing Dependencies..." : `Install ${selectedModel.id.toUpperCase()} Dependencies`}
+            </Button>
+          )}
         </Box>
 
         {/* 2. Target Video Duration (Supports 1-2 Minutes!) */}

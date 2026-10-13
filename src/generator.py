@@ -1,13 +1,14 @@
 import os
-from typing import Optional
 import torch
-from .utils import load_image_safely, save_frames_to_video, concatenate_video_clips
+from src.utils import load_image_safely, save_frames_to_video, concatenate_video_clips
+from src.models import ModelRegistry
+
 
 def generate_single_video(
     pipe,
-    image_path: Optional[str] = None,
-    prompt: str = "",
-    negative_prompt: str = "worst quality, blurry, distorted, low resolution",
+    prompt: str,
+    negative_prompt: str,
+    image_path: str = None,
     steps: int = 30,
     frames: int = 81,
     fps: int = 25,
@@ -20,17 +21,18 @@ def generate_single_video(
     duration: int = 5,
 ) -> str:
     """
-    Generate a video.
+    Generate a video delegating model-specific generation parameters to the registered engine.
     Supports single clips (5s - 10s) and extended multi-shot presentations (30s, 60s / 1 min, 120s / 2 min).
     """
     has_image = image_path is not None and os.path.exists(image_path)
     image = load_image_safely(image_path) if has_image else None
     mode_label = "Image-to-Video" if has_image else "Text-to-Video"
+    engine = ModelRegistry.get(model_name)
 
     # Case A: Extended presentation / 1-2 min video (duration >= 30s)
     if duration >= 30:
         num_shots = max(1, round(duration / 5.0))
-        print(f"\n[Generator] Generating {duration}s ({duration // 60}m {duration % 60}s) video via {num_shots} sequential shots...")
+        print(f"\n[Generator] Generating {duration}s ({duration // 60}m {duration % 60}s) video via {num_shots} sequential shots with {engine.name}...")
 
         temp_dir = os.path.join(os.path.dirname(output_path), "temp_shots")
         os.makedirs(temp_dir, exist_ok=True)
@@ -41,34 +43,18 @@ def generate_single_video(
             print(f"🎬 [Shot {shot_idx + 1}/{num_shots}] Generating sequence...")
             generator = torch.Generator(device=device).manual_seed(seed + shot_idx * 17)
 
-            if model_name.lower() == "ltx":
-                kwargs = {
-                    "prompt": prompt,
-                    "negative_prompt": negative_prompt,
-                    "width": width,
-                    "height": height,
-                    "num_frames": 121,
-                    "frame_rate": fps,
-                    "num_inference_steps": steps,
-                    "guidance_scale": 3.0,
-                    "generator": generator,
-                }
-                if has_image:
-                    kwargs["image"] = image
-                video_frames = pipe(**kwargs).frames[0]
-            else:
-                kwargs = {
-                    "prompt": prompt,
-                    "negative_prompt": negative_prompt,
-                    "num_frames": 49,
-                    "num_inference_steps": steps,
-                    "guidance_scale": 6.0,
-                    "generator": generator,
-                }
-                if has_image:
-                    kwargs["image"] = image
-                video_frames = pipe(**kwargs).frames[0]
-                fps = 8
+            video_frames = engine.generate(
+                pipe=pipe,
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                image=image,
+                width=width,
+                height=height,
+                num_frames=121 if engine.id == "ltx" else engine.default_frames,
+                fps=fps,
+                steps=steps,
+                generator=generator,
+            )
 
             save_frames_to_video(video_frames, shot_file, fps=fps)
             shot_paths.append(shot_file)
@@ -80,44 +66,26 @@ def generate_single_video(
 
     # Case B: Standard clip (5s - 10s)
     generator = torch.Generator(device=device).manual_seed(seed)
-    print(f"\n[Generator] Mode: {mode_label} | {frames} frames @ {fps} FPS, {steps} steps")
+    print(f"\n[Generator] Engine: {engine.name} | Mode: {mode_label} | {frames} frames @ {fps} FPS, {steps} steps")
     print(f"[Generator] Prompt: \"{prompt}\"")
 
-    if model_name.lower() == "ltx":
-        valid_frames = frames if (frames - 1) % 8 == 0 else 81
-        kwargs = {
-            "prompt": prompt,
-            "negative_prompt": negative_prompt,
-            "width": width,
-            "height": height,
-            "num_frames": valid_frames,
-            "frame_rate": fps,
-            "num_inference_steps": steps,
-            "guidance_scale": 3.0,
-            "generator": generator,
-        }
-        if has_image:
-            kwargs["image"] = image
-
-        video_frames = pipe(**kwargs).frames[0]
-    else:
-        kwargs = {
-            "prompt": prompt,
-            "negative_prompt": negative_prompt,
-            "num_frames": 49,
-            "num_inference_steps": steps,
-            "guidance_scale": 6.0,
-            "generator": generator,
-        }
-        if has_image:
-            kwargs["image"] = image
-
-        video_frames = pipe(**kwargs).frames[0]
-        fps = 8
+    video_frames = engine.generate(
+        pipe=pipe,
+        prompt=prompt,
+        negative_prompt=negative_prompt,
+        image=image,
+        width=width,
+        height=height,
+        num_frames=frames,
+        fps=fps,
+        steps=steps,
+        generator=generator,
+    )
 
     save_frames_to_video(video_frames, output_path, fps=fps)
     print(f"[Generator] Clip saved successfully: {output_path}")
     return output_path
+
 
 def generate_multi_scene_video(
     pipe,
@@ -134,9 +102,10 @@ def generate_multi_scene_video(
     """Generate multiple sequential scenes and stitch them into a master presentation."""
     os.makedirs(temp_dir, exist_ok=True)
     clip_paths = []
+    engine = ModelRegistry.get(model_name)
 
     print(f"\n==========================================")
-    print(f"🎬 Starting Multi-Scene Presentation ({len(scenes)} scenes, Target: {duration}s)")
+    print(f"🎬 Starting Multi-Scene Presentation ({len(scenes)} scenes with {engine.name}, Target: {duration}s)")
     print(f"==========================================")
 
     for idx, scene in enumerate(scenes, start=1):
@@ -164,7 +133,7 @@ def generate_multi_scene_video(
             output_path=scene_clip_path,
             model_name=model_name,
             seed=42 + idx,
-            duration=5, # Each scene rendered as a discrete shot
+            duration=5,  # Each scene rendered as a discrete shot
         )
         clip_paths.append(scene_clip_path)
 

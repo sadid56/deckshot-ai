@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 import config
+from src.models import ModelRegistry
 from src.pipeline import load_video_pipeline
 from src.generator import generate_single_video, generate_multi_scene_video
 
@@ -145,7 +146,26 @@ def get_system_info():
         "device": device.upper(),
         "is_accelerated": device in ["cuda", "mps"],
         "default_model": config.DEFAULT_MODEL,
+        "models": ModelRegistry.list_models(),
     }
+
+@app.get("/api/models")
+def get_available_models():
+    """Return all registered model engines, specs, and installation status."""
+    return ModelRegistry.list_models()
+
+@app.post("/api/models/{model_id}/install")
+def install_model_deps(model_id: str):
+    """Automatically install dependencies for a specific model."""
+    try:
+        success = ModelRegistry.install(model_id)
+        return {
+            "status": "success" if success else "failed",
+            "model_id": model_id,
+            "installed": success,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/api/generate")
 async def api_generate_single(

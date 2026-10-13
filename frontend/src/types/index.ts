@@ -20,3 +20,15 @@ export interface GenerationSettings {
   aspectRatio: string; // "16:9" | "9:16" | "1:1"
   negativePrompt: string;
 }
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  description: string;
+  recommended_hardware: string;
+  default_fps: number;
+  default_steps: number;
+  default_frames: number;
+  installed: boolean;
+  dependencies: string[];
+}
