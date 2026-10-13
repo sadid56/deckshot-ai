@@ -218,17 +218,27 @@ pipe = LTXPipeline.from_pretrained(
 pipe.vae.enable_tiling()
 
 @app.post("/generate")
-def generate_video(prompt: str = Form(...), steps: int = Form(20), frames: int = Form(25)):
-    # T4 GPU-র জন্য সেফ ফ্রেম (25 ফ্রেম = ক্র্যাশ ছাড়া ১০০% সফল রেন্ডার)
-    num_frames = 25
+def generate_video(
+    prompt: str = Form(...), 
+    steps: int = Form(20), 
+    frames: int = Form(81),
+    duration: int = Form(5),
+    fps: int = Form(16)
+):
+    # 5s এর জন্য 81 ফ্রেম (~5s) এবং 10s এর জন্য 161 ফ্রেম (~10s)
+    req_frames = int(frames) if int(frames) > 0 else 81
+    num_frames = ((req_frames - 1) // 8) * 8 + 1
+    num_frames = max(41, min(num_frames, 161))
+    
+    target_fps = int(fps) if int(fps) > 0 else 16
     output = pipe(
         prompt=prompt,
-        num_inference_steps=20,
+        num_inference_steps=int(steps) if int(steps) <= 25 else 20,
         num_frames=num_frames,
         width=512,
         height=320
     ).frames[0]
-    export_to_video(output, "output.mp4", fps=16)
+    export_to_video(output, "output.mp4", fps=target_fps)
     return FileResponse("output.mp4", media_type="video/mp4")
 
 # ব্যাকগ্রাউন্ডে সার্ভার চালানো

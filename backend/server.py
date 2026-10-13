@@ -107,11 +107,17 @@ def run_single_job(
             if is_i2v:
                 files["image"] = (os.path.basename(image_path), open(image_path, "rb"), "image/jpeg")
 
+            # Calculate target frames based on requested duration:
+            # 5s target -> 81 frames (~5.0s at 16 fps)
+            # 10s target -> 161 frames (~10.0s at 16 fps)
+            target_frames = 81 if duration <= 5 else 161
             data = {
                 "prompt": prompt,
                 "negative_prompt": negative_prompt,
                 "steps": min(steps, 25),
-                "frames": 25,
+                "frames": target_frames,
+                "duration": duration,
+                "fps": 16,
             }
 
             JOBS[job_id]["progress"] = 45
