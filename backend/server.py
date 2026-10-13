@@ -89,6 +89,13 @@ def run_single_job(
         output_filename = f"gen_{uuid.uuid4().hex[:8]}.mp4"
         output_filepath = os.path.join(config.OUTPUTS_DIR, output_filename)
 
+        # Reload .env dynamically so any COLAB_URL change takes effect immediately without restart
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(os.path.join(config.PROJECT_ROOT, ".env"), override=True)
+        except Exception:
+            pass
+
         colab_url = os.environ.get("COLAB_URL", "").strip().rstrip("/")
         if colab_url:
             JOBS[job_id]["status"] = "running"
@@ -103,8 +110,8 @@ def run_single_job(
             data = {
                 "prompt": prompt,
                 "negative_prompt": negative_prompt,
-                "steps": steps,
-                "frames": frames,
+                "steps": min(steps, 25),
+                "frames": 25,
             }
 
             JOBS[job_id]["progress"] = 45

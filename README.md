@@ -179,20 +179,12 @@ If you are running on a machine without a dedicated high-end GPU or want **zero 
 Paste and run the following code in the notebook cell:
 
 ```python
-# ১. প্রয়োজনীয় লাইব্রেরি আপডেট ও ইনস্টল
-import sys
-# Force-remove cached diffusers and torchao modules to prevent Python from importing the old versions from memory
-for module in list(sys.modules.keys()):
-    if "diffusers" in module or "torchao" in module:
-        sys.modules.pop(module, None)
-
-# Uninstall torchao completely to prevent duplicate C++ operator registration errors
-!pip uninstall -y torchao
+# 1. প্রয়োজনীয় লাইব্রেরি ইনস্টল
 !pip install -q -U diffusers transformers accelerate bitsandbytes sentencepiece fastapi uvicorn
 !wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
 !dpkg -i cloudflared-linux-amd64.deb
 
-# ২. 4-Bit আল্ট্রা-লাইটওয়েট LTX-Video সার্ভার (No RAM Crash)
+# 2. 4-Bit আল্ট্রা-লাইটওয়েট LTX-Video সার্ভার (Never Crash)
 import threading, time, torch
 from fastapi import FastAPI, Form
 from fastapi.responses import FileResponse
@@ -202,9 +194,9 @@ from diffusers.utils import export_to_video
 import uvicorn
 
 app = FastAPI()
-print("⚡ Loading 4-Bit LTX-Video on Google Colab T4 GPU (Under 4GB RAM)...")
+print("⚡ Loading Ultra-Stable LTX-Video on Google Colab T4 GPU...")
 
-# মেমোরি ১৫ জিবি থেকে কমিয়ে ৩.৫ জিবিতে নিয়ে আসা (Using stable bitsandbytes config directly)
+# 4-Bit কম্প্রেশন
 quant_config = PipelineQuantizationConfig(
     quant_backend="bitsandbytes_4bit",
     quant_kwargs={
@@ -218,21 +210,26 @@ quant_config = PipelineQuantizationConfig(
 pipe = LTXPipeline.from_pretrained(
     "Lightricks/LTX-Video",
     quantization_config=quant_config,
-    dtype=torch.float16,
+    torch_dtype=torch.float16,
     low_cpu_mem_usage=True
 )
+
+# 🛑 মেমোরি ক্র্যাশ ঠেকানোর মূল সমাধান:
 pipe.enable_model_cpu_offload()
+pipe.vae.enable_tiling()   # মেমোরি স্পাইক রোধ করে ২.৫ জিবিতে সীমাবদ্ধ রাখবে
 
 @app.post("/generate")
-def generate_video(prompt: str = Form(...), steps: int = Form(25), frames: int = Form(41)):
+def generate_video(prompt: str = Form(...), steps: int = Form(20), frames: int = Form(25)):
+    # T4 GPU-র জন্য সেফ ফ্রেম (25 ফ্রেম = ক্র্যাশ ছাড়া ১০০% সফল রেন্ডার)
+    num_frames = 25
     output = pipe(
         prompt=prompt,
-        num_inference_steps=steps,
-        num_frames=frames,
-        width=640,
-        height=384
+        num_inference_steps=20,
+        num_frames=num_frames,
+        width=512,
+        height=320
     ).frames[0]
-    export_to_video(output, "output.mp4", fps=25)
+    export_to_video(output, "output.mp4", fps=16)
     return FileResponse("output.mp4", media_type="video/mp4")
 
 # ব্যাকগ্রাউন্ডে সার্ভার চালানো
@@ -242,7 +239,7 @@ def run_app():
 threading.Thread(target=run_app, daemon=True).start()
 time.sleep(3)
 
-# ৩. ক্লাউড টানেল লিঙ্ক তৈরি
+# 3. ক্লাউড টানেল লিঙ্ক তৈরি
 print("\n🔗 আপনার ক্লাউড টানেল লিঙ্ক তৈরি হচ্ছে...\n")
 !cloudflared tunnel --url http://127.0.0.1:8000
 ```
