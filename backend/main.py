@@ -4,6 +4,19 @@ import json
 import argparse
 import warnings
 
+# Ensure backend directory is in sys.path when run from root
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
+# Load .env from project root
+try:
+    from dotenv import load_dotenv
+    root_dir = os.path.dirname(backend_dir)
+    load_dotenv(os.path.join(root_dir, ".env"))
+except ImportError:
+    pass
+
 # Suppress environment-specific warnings on macOS
 warnings.filterwarnings("ignore", message=".*urllib3 v2 only supports OpenSSL.*")
 warnings.filterwarnings(

@@ -13,8 +13,9 @@ import torch
 
 # Base directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUTS_DIR = os.path.join(BASE_DIR, "assets", "inputs")
-OUTPUTS_DIR = os.path.join(BASE_DIR, "assets", "outputs")
+PROJECT_ROOT = os.path.dirname(BASE_DIR)
+INPUTS_DIR = os.path.join(PROJECT_ROOT, "assets", "inputs")
+OUTPUTS_DIR = os.path.join(PROJECT_ROOT, "assets", "outputs")
 
 # Ensure required directories exist
 os.makedirs(INPUTS_DIR, exist_ok=True)

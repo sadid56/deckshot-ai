@@ -1,9 +1,23 @@
 import os
 import sys
+
+# Ensure backend directory is in sys.path when run from root
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
 import uuid
 import json
 import time
 import warnings
+
+# Load .env from project root
+try:
+    from dotenv import load_dotenv
+    root_dir = os.path.dirname(backend_dir)
+    load_dotenv(os.path.join(root_dir, ".env"))
+except ImportError:
+    pass
 
 # Suppress environment-specific warnings on macOS
 warnings.filterwarnings("ignore", message=".*urllib3 v2 only supports OpenSSL.*")
@@ -72,6 +86,42 @@ def run_single_job(
         is_i2v = image_path is not None and os.path.exists(image_path)
         mode_name = "Image-to-Video" if is_i2v else "Text-to-Video"
 
+        output_filename = f"gen_{uuid.uuid4().hex[:8]}.mp4"
+        output_filepath = os.path.join(config.OUTPUTS_DIR, output_filename)
+
+        colab_url = os.environ.get("COLAB_URL", "").strip().rstrip("/")
+        if colab_url:
+            JOBS[job_id]["status"] = "running"
+            JOBS[job_id]["progress"] = 25
+            JOBS[job_id]["logs"].append(f"Dispatching to Google Colab Free GPU ({colab_url})...")
+            import requests
+
+            files = {}
+            if is_i2v:
+                files["image"] = (os.path.basename(image_path), open(image_path, "rb"), "image/jpeg")
+
+            data = {
+                "prompt": prompt,
+                "negative_prompt": negative_prompt,
+                "steps": steps,
+                "frames": frames,
+            }
+
+            JOBS[job_id]["progress"] = 45
+            JOBS[job_id]["logs"].append("Colab NVIDIA GPU synthesizing video frames (0% Mac load)...")
+            res = requests.post(f"{colab_url}/generate", data=data, files=files if files else None, timeout=300)
+            if res.status_code != 200:
+                raise RuntimeError(f"Colab returned HTTP {res.status_code}: {res.text[:200]}")
+
+            with open(output_filepath, "wb") as f:
+                f.write(res.content)
+
+            JOBS[job_id]["progress"] = 100
+            JOBS[job_id]["status"] = "completed"
+            JOBS[job_id]["video_url"] = f"/api/videos/{output_filename}"
+            JOBS[job_id]["logs"].append(f"Video generated on Colab GPU and downloaded: {output_filename}")
+            return
+
         JOBS[job_id]["status"] = "running"
         JOBS[job_id]["progress"] = 15
         JOBS[job_id]["logs"].append(f"Initializing {model_name.upper()} ({mode_name}) for {duration}s video...")
@@ -81,9 +131,6 @@ def run_single_job(
 
         JOBS[job_id]["progress"] = 35
         JOBS[job_id]["logs"].append(f"Model ready. Commencing {mode_name} latent synthesis ({duration}s target)...")
-
-        output_filename = f"gen_{uuid.uuid4().hex[:8]}.mp4"
-        output_filepath = os.path.join(config.OUTPUTS_DIR, output_filename)
 
         generate_single_video(
             pipe=pipe,
