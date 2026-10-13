@@ -211,12 +211,11 @@ pipe = LTXPipeline.from_pretrained(
     "Lightricks/LTX-Video",
     quantization_config=quant_config,
     torch_dtype=torch.float16,
-    low_cpu_mem_usage=True
+    device_map="cuda"
 )
 
-# 🛑 মেমোরি ক্র্যাশ ঠেকানোর মূল সমাধান:
-pipe.enable_model_cpu_offload()
-pipe.vae.enable_tiling()   # মেমোরি স্পাইক রোধ করে ২.৫ জিবিতে সীমাবদ্ধ রাখবে
+# 🛑 VAE টাইলিং অন রাখা হলো যাতে পিক VRAM সর্বদা কম থাকে
+pipe.vae.enable_tiling()
 
 @app.post("/generate")
 def generate_video(prompt: str = Form(...), steps: int = Form(20), frames: int = Form(25)):
